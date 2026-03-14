@@ -1,15 +1,14 @@
 credentials:
   usernames:
     testuser:
+      email: testuser@example.com
       name: Test User
-      password: "test123"          # plain text for now — we'll hash later
+      password: "$2b$12$CClEkr.f6wwrPQhiZR.Oge2w3f2CxxImzle7P4jnm.4O8vsJWfAAC"
     yourname:
-      name: Your Real Name
-      password: "yourstrongpassword"
+      email: yourname@example.com
+      name: Your Name
+      password: "$2b$12$09AuHBAl1QjvZoNuhd4Af.andNAcrR7OwpjBBcLjj9qrMa09PIAOK"
 cookie:
   expiry_days: 30
-  key: some_random_secret_key_123  # change this to something unique
-  name: conductor_cookie
-preauthorized:
-  emails:
-    - your.email@example.com
+  key: ai_conductor_secret_key_change_me
+  name: ai_conductor_auth
