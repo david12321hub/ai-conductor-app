@@ -1,0 +1,95 @@
+import streamlit as st
+from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+st.set_page_config(page_title="AI Conductor", page_icon="🎼", layout="centered")
+st.title("🎼 Your Personal AI Conductor")
+st.caption("One question → Multiple AIs → Best plan + execution")
+
+# ==================== Setup LLMs ====================
+@st.cache_resource
+def get_models():
+    return {
+        "claude": ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3),
+        "gemini": ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3),
+        "synthesizer": ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.2)
+    }
+
+models = get_models()
+
+# Session state for conversation
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# User input
+if prompt := st.chat_input("What would you like to build or solve?"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Conductor is thinking..."):
+            # Stage 1: Get answers + synthesize plan
+            raw_claude = models["claude"].invoke(prompt).content
+            raw_gemini = models["gemini"].invoke(prompt).content
+            
+            synth_prompt = ChatPromptTemplate.from_messages([
+                ("system", "Create one clear, actionable plan by combining the best parts."),
+                ("human", f"Question: {prompt}\n\nClaude: {raw_claude}\n\nGemini: {raw_gemini}")
+            ])
+            plan = (synth_prompt | models["synthesizer"]).invoke({}).content
+
+            st.markdown("**Synthesized Plan:**")
+            st.write(plan)
+
+            # Stage 2: Run agents
+            code_agent = (ChatPromptTemplate.from_template("Write clean Python code for this plan:\n{plan}") | models["synthesizer"]).invoke({"plan": plan}).content
+            planning_agent = (ChatPromptTemplate.from_template("Break this into detailed numbered steps:\n{plan}") | models["synthesizer"]).invoke({"plan": plan}).content
+
+            # Judge & final result
+            final = f"""**Final Result from AI Conductor**
+
+**Plan Summary:**
+{plan}
+
+**Code Agent Output:**
+{code_agent}
+
+**Planning Agent Output:**
+{planning_agent}
+
+**Recommended Next Step:** Save the code above and run it!
+"""
+
+            st.markdown(final)
+
+            # Save to file
+            with open("conductor_result.md", "w", encoding="utf-8") as f:
+                f.write(final)
+            
+            st.success("✅ Result saved as conductor_result.md (download it from the Files panel on the left)")
+
+            # Pricing estimate (step 5)
+            est_cost = "≈ $0.08–$0.25 (depending on length)"
+            st.caption(f"💰 Estimated cost for this run: {est_cost}")
+
+            st.session_state.messages.append({"role": "assistant", "content": final})
+
+# Sidebar info
+with st.sidebar:
+    st.header("How it works")
+    st.write("1. Multiple AIs answer your question")
+    st.write("2. Conductor creates one strong plan")
+    st.write("3. Agents compete (Code + Planning)")
+    st.write("4. You get the best combined result + downloadable file")
+    st.caption("Built with ❤️ using LangGraph + Streamlit")

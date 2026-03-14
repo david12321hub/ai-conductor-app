@@ -3,6 +3,7 @@
 ## Overview
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Also includes a Python Streamlit app (AI Conductor) at the root.
 
 ## Stack
 
@@ -15,11 +16,35 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Python**: 3.11 (Streamlit app)
+
+## AI Conductor App (Streamlit)
+
+A Python Streamlit app at `app.py` that:
+1. Sends user questions to Claude (Anthropic) and Gemini in parallel
+2. Synthesizes a combined plan using Claude as the orchestrator
+3. Runs a Code Agent (generates Python code for the plan)
+4. Runs a Planning Agent (breaks the plan into numbered steps)
+5. Saves the result to `conductor_result.md`
+
+### Running the app
+```bash
+streamlit run app.py
+```
+The workflow "Start application" runs this command and serves at port 5000.
+
+### AI Integrations
+Uses Replit AI Integrations (no user API keys required):
+- `AI_INTEGRATIONS_ANTHROPIC_BASE_URL` + `AI_INTEGRATIONS_ANTHROPIC_API_KEY` → Claude (claude-sonnet-4-6)
+- `AI_INTEGRATIONS_GEMINI_BASE_URL` + `AI_INTEGRATIONS_GEMINI_API_KEY` → Gemini (gemini-2.5-flash)
 
 ## Structure
 
 ```text
 artifacts-monorepo/
+├── app.py                  # AI Conductor Streamlit app
+├── .streamlit/
+│   └── config.toml         # Streamlit server config (port 5000)
 ├── artifacts/              # Deployable applications
 │   └── api-server/         # Express API server
 ├── lib/                    # Shared libraries
