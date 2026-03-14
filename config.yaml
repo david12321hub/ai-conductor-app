@@ -1,0 +1,15 @@
+credentials:
+  usernames:
+    testuser:
+      name: Test User
+      password: "test123"          # plain text for now — we'll hash later
+    yourname:
+      name: Your Real Name
+      password: "yourstrongpassword"
+cookie:
+  expiry_days: 30
+  key: some_random_secret_key_123  # change this to something unique
+  name: conductor_cookie
+preauthorized:
+  emails:
+    - your.email@example.com
