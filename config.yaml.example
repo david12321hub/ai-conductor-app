@@ -1,0 +1,10 @@
+credentials:
+  usernames:
+    yourusername:
+      email: you@example.com
+      name: Your Name
+      password: your_hashed_password_here
+cookie:
+  expiry_days: 30
+  key: your_secret_key_at_least_32_chars_long
+  name: ai_conductor_auth
