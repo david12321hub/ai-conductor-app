@@ -1,0 +1,100 @@
+import streamlit as st
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
+from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ==================== Authentication Setup ====================
+with open('config.yaml') as file:
+    config = yaml.load(file, Loader=SafeLoader)
+
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days'],
+    config['preauthorized']
+)
+
+name, authentication_status, username = authenticator.login('Login', 'main')
+
+if authentication_status:
+    st.success(f"Welcome, {name}!")
+
+    # ==================== Usage Counter (per user) ====================
+    if 'usage_count' not in st.session_state:
+        st.session_state.usage_count = 0
+
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
+
+    # Display usage
+    st.sidebar.metric("Your Usage Today", f"{st.session_state.usage_count} queries")
+
+    # Limit: e.g. 10 free queries per session (you can change)
+    MAX_FREE_QUERIES = 10
+    if st.session_state.usage_count >= MAX_FREE_QUERIES:
+        st.warning(f"You've reached the free limit ({MAX_FREE_QUERIES} queries). Upgrade coming soon!")
+        st.stop()
+
+    # ==================== Main App ====================
+    st.set_page_config(page_title="AI Conductor", page_icon="🎼", layout="centered")
+    st.title("🎼 AI Conductor")
+    st.caption("One task → Multiple AIs → Best plan + execution")
+
+    @st.cache_resource
+    def get_models():
+        return {
+            "claude": ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.3),
+            "gemini": ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3),
+            "synthesizer": ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.2)
+        }
+
+    models = get_models()
+
+    # Chat history
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # User input
+    if prompt := st.chat_input("What would you like to build or solve?"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            with st.spinner("Conductor is working..."):
+                st.session_state.usage_count += 1  # count this query
+
+                # Stage 1: Parallel + Synthesize Plan
+                raw_claude = models["claude"].invoke(prompt).content
+                raw_gemini = models["gemini"].invoke(prompt).content
+
+                synth_prompt = ChatPromptTemplate.from_messages([
+                    ("system", "Create one clear, actionable plan by combining the best parts."),
+                    ("human", f"Task: {prompt}\n\nClaude: {raw_claude}\n\nGemini: {raw_gemini}")
+                ])
+                plan = (synth_prompt | models["synthesizer"]).invoke({}).content
+
+                st.markdown("**Synthesized Plan:**")
+                st.write(plan)
+
+                # Stage 2: Agents
+                code_agent = (ChatPromptTemplate.from_template("Write clean Python code for this plan:\n{plan}") | models["synthesizer"]).invoke({"plan": plan}).content
+                planning_agent = (ChatPromptTemplate.from_template("Break this into detailed numbered steps:\n{plan}") | models["synthesizer"]).invoke({"plan": plan}).content
+
+                final = f"""**Final Result**
+
+**Plan Summary:**
+{plan}
+
+**Code Agent Output:**
+```python
+{code_agent}
