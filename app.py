@@ -114,46 +114,55 @@ elif authentication_status:
         with st.chat_message("assistant"):
             st.session_state.usage_count += 1
 
-            status = st.status("Conductor is working...", expanded=True)
-
-            with status:
+            try:
                 claude = get_claude(temperature=0.3)
                 synthesizer = get_claude(temperature=0.2)
 
-                st.write("🤖 Asking Claude...")
-                raw_claude = claude.invoke(prompt).content
+                # --- Step 1: Gather raw answers ---
+                status = st.status("🤖 Asking Claude...", expanded=True)
+                with status:
+                    raw_claude = claude.invoke(prompt).content
+                    status.update(label="✅ Claude answered")
 
-                st.write("✨ Asking Gemini...")
-                raw_gemini = ask_gemini(prompt)
+                status2 = st.status("✨ Asking Gemini...", expanded=True)
+                with status2:
+                    raw_gemini = ask_gemini(prompt)
+                    status2.update(label="✅ Gemini answered")
 
-                st.write("🎼 Synthesizing best plan...")
-                plan = synthesizer.invoke([
-                    SystemMessage(content="Create one clear, actionable plan by combining the best parts."),
-                    HumanMessage(content=f"Task: {prompt}\n\nClaude: {raw_claude}\n\nGemini: {raw_gemini}"),
-                ]).content
+                # --- Step 2: Synthesize plan (show immediately) ---
+                status3 = st.status("🎼 Synthesizing plan...", expanded=True)
+                with status3:
+                    plan = synthesizer.invoke([
+                        SystemMessage(content="Create one clear, actionable plan by combining the best parts."),
+                        HumanMessage(content=f"Task: {prompt}\n\nClaude: {raw_claude}\n\nGemini: {raw_gemini}"),
+                    ]).content
+                    status3.update(label="✅ Plan ready")
 
-                st.write("💻 Running Code Agent...")
-                code_agent = synthesizer.invoke([
-                    HumanMessage(content=f"Write clean Python code for this plan:\n{plan}"),
-                ]).content
+                st.markdown("**📋 Synthesized Plan:**")
+                st.write(plan)
 
-                st.write("📋 Running Planning Agent...")
-                planning_agent = synthesizer.invoke([
-                    HumanMessage(content=f"Break this into detailed numbered steps:\n{plan}"),
-                ]).content
+                # --- Step 3: Run agents ---
+                status4 = st.status("💻 Running Code Agent...", expanded=True)
+                with status4:
+                    code_agent = synthesizer.invoke([
+                        HumanMessage(content=f"Write clean Python code for this plan:\n{plan}"),
+                    ]).content
+                    status4.update(label="✅ Code Agent done")
 
-            status.update(label="Done!", state="complete")
+                status5 = st.status("📋 Running Planning Agent...", expanded=True)
+                with status5:
+                    planning_agent = synthesizer.invoke([
+                        HumanMessage(content=f"Break this into detailed numbered steps:\n{plan}"),
+                    ]).content
+                    status5.update(label="✅ Planning Agent done")
 
-            st.markdown("**Synthesized Plan:**")
-            st.write(plan)
+                with st.expander("💻 Code Agent Output"):
+                    st.markdown(code_agent)
 
-            with st.expander("💻 Code Agent Output"):
-                st.markdown(code_agent)
+                with st.expander("📋 Planning Agent Output"):
+                    st.markdown(planning_agent)
 
-            with st.expander("📋 Planning Agent Output"):
-                st.markdown(planning_agent)
-
-            final = f"""**Final Result**
+                final = f"""**Final Result**
 
 **Plan Summary:**
 {plan}
@@ -169,11 +178,13 @@ elif authentication_status:
 **Recommended Next Step:** Save the code above and run it!
 """
 
-            # Save to file
-            with open(Path(__file__).parent / "conductor_result.md", "w", encoding="utf-8") as f:
-                f.write(f"# Question\n{prompt}\n\n{final}")
+                with open(Path(__file__).parent / "conductor_result.md", "w", encoding="utf-8") as f:
+                    f.write(f"# Question\n{prompt}\n\n{final}")
 
-            st.success("✅ Result saved as conductor_result.md")
-            st.caption("💰 Estimated cost per run: ≈ $0.08–$0.25 depending on length")
+                st.success("✅ Result saved as conductor_result.md")
+                st.caption("💰 Estimated cost per run: ≈ $0.08–$0.25 depending on length")
+                st.session_state.messages.append({"role": "assistant", "content": final})
 
-            st.session_state.messages.append({"role": "assistant", "content": final})
+            except Exception as e:
+                st.error(f"❌ Something went wrong: {e}")
+                st.session_state.usage_count = max(0, st.session_state.usage_count - 1)

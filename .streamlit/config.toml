@@ -1,3 +1,8 @@
 [server]
 headless = true
 address = "0.0.0.0"
+maxUploadSize = 200
+maxMessageSize = 200
+
+[browser]
+gatherUsageStats = false
