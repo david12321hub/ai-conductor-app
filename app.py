@@ -3,7 +3,7 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 from langchain_anthropic import ChatAnthropic
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
 from google.genai import types
 import os
@@ -127,23 +127,20 @@ elif authentication_status:
                 raw_gemini = ask_gemini(prompt)
 
                 st.write("🎼 Synthesizing best plan...")
-                synth_prompt = ChatPromptTemplate.from_messages([
-                    ("system", "Create one clear, actionable plan by combining the best parts."),
-                    ("human", f"Task: {prompt}\n\nClaude: {raw_claude}\n\nGemini: {raw_gemini}")
-                ])
-                plan = (synth_prompt | synthesizer).invoke({}).content
+                plan = synthesizer.invoke([
+                    SystemMessage(content="Create one clear, actionable plan by combining the best parts."),
+                    HumanMessage(content=f"Task: {prompt}\n\nClaude: {raw_claude}\n\nGemini: {raw_gemini}"),
+                ]).content
 
                 st.write("💻 Running Code Agent...")
-                code_agent = (
-                    ChatPromptTemplate.from_template("Write clean Python code for this plan:\n{plan}")
-                    | synthesizer
-                ).invoke({"plan": plan}).content
+                code_agent = synthesizer.invoke([
+                    HumanMessage(content=f"Write clean Python code for this plan:\n{plan}"),
+                ]).content
 
                 st.write("📋 Running Planning Agent...")
-                planning_agent = (
-                    ChatPromptTemplate.from_template("Break this into detailed numbered steps:\n{plan}")
-                    | synthesizer
-                ).invoke({"plan": plan}).content
+                planning_agent = synthesizer.invoke([
+                    HumanMessage(content=f"Break this into detailed numbered steps:\n{plan}"),
+                ]).content
 
             status.update(label="Done!", state="complete")
 
