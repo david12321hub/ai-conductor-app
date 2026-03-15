@@ -1,7 +1,5 @@
 import streamlit as st
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
+from supabase import create_client, Client
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
@@ -10,114 +8,104 @@ import os
 
 st.set_page_config(page_title="AI Conductor", page_icon="🎼", layout="centered")
 
-# ==================== Authentication Setup ====================
-COOKIE_NAME = st.secrets.get("COOKIE_NAME", "ai_conductor_auth") if hasattr(st, "secrets") else "ai_conductor_auth"
-COOKIE_KEY = st.secrets.get("COOKIE_KEY", "ai_conductor_secret_key_change_me") if hasattr(st, "secrets") else "ai_conductor_secret_key_change_me"
-COOKIE_EXPIRY = int(st.secrets.get("COOKIE_EXPIRY_DAYS", 30)) if hasattr(st, "secrets") else 30
+# ==================== Supabase Setup ====================
+supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+supabase_key = st.secrets.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_ANON_KEY")
 
-@st.cache_data(ttl=60)
-def load_credentials():
-    # 1. Try Supabase first
-    try:
-        from supabase_auth import load_credentials_from_supabase
-        return load_credentials_from_supabase()
-    except Exception:
-        pass
-    # 2. Fall back to Streamlit secrets credentials block
-    try:
-        if "credentials" in st.secrets:
-            return st.secrets["credentials"].to_dict()
-    except Exception:
-        pass
-    # 3. Fall back to config.yaml
-    config_path = Path(__file__).parent / "config.yaml"
-    if config_path.exists():
-        with open(config_path) as f:
-            cfg = yaml.load(f, SafeLoader)
-        return cfg.get("credentials", {"usernames": {}})
-    st.error("No authentication config found. Set up Supabase or add a config.yaml.")
+if not supabase_url or not supabase_key:
+    st.error("Supabase credentials not found. Add SUPABASE_URL and SUPABASE_ANON_KEY to Streamlit secrets.")
     st.stop()
 
-credentials = load_credentials()
+supabase: Client = create_client(supabase_url, supabase_key)
 
-authenticator = stauth.Authenticate(
-    credentials,
-    COOKIE_NAME,
-    COOKIE_KEY,
-    COOKIE_EXPIRY,
-)
+# ==================== Session State ====================
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "usage_count" not in st.session_state:
+    st.session_state.usage_count = 0
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-authenticator.login()
+# ==================== Auth UI ====================
+def show_auth():
+    st.title("🎼 AI Conductor")
+    st.caption("One task → Multiple AIs → Best plan + execution")
+    st.divider()
 
-name = st.session_state.get("name")
-authentication_status = st.session_state.get("authentication_status")
+    tab_login, tab_signup = st.tabs(["Log In", "Sign Up"])
 
-if authentication_status is False:
-    st.error("Username/password is incorrect")
-elif authentication_status is None:
-    st.warning("Please enter your username and password")
-elif authentication_status:
-    st.success(f"Welcome, {name}!")
+    with tab_login:
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_pw")
+        if st.button("Log In", use_container_width=True):
+            try:
+                response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                if response.user:
+                    st.session_state.user = response.user
+                    st.rerun()
+                else:
+                    st.error("Login failed.")
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
 
-    # ==================== Usage Counter ====================
-    if 'usage_count' not in st.session_state:
-        st.session_state.usage_count = 0
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
+    with tab_signup:
+        new_email = st.text_input("Email", key="signup_email")
+        new_password = st.text_input("Password", type="password", key="signup_pw")
+        confirm_pw = st.text_input("Confirm Password", type="password", key="signup_confirm")
+        if st.button("Create Account", use_container_width=True):
+            if new_password != confirm_pw:
+                st.error("Passwords don't match.")
+            elif len(new_password) < 8:
+                st.error("Password must be at least 8 characters.")
+            else:
+                try:
+                    response = supabase.auth.sign_up({"email": new_email, "password": new_password})
+                    if response.user:
+                        st.success("Account created! Check your email to confirm, then log in.")
+                    else:
+                        st.error("Sign up failed — email may already be in use.")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
+# ==================== AI Clients ====================
+def get_anthropic_key():
+    api_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY")
+    base_url = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL")
+    return api_key, base_url
+
+def get_gemini_key():
+    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("AI_INTEGRATIONS_GEMINI_API_KEY")
+    base_url = os.environ.get("AI_INTEGRATIONS_GEMINI_BASE_URL")
+    return api_key, base_url
+
+@st.cache_resource
+def get_claude(temperature: float = 0.3):
+    api_key, base_url = get_anthropic_key()
+    kwargs = dict(model="claude-sonnet-4-5", anthropic_api_key=api_key,
+                  temperature=temperature, max_tokens=8192)
+    if base_url:
+        kwargs["anthropic_api_url"] = base_url
+    return ChatAnthropic(**kwargs)
+
+@st.cache_resource
+def get_gemini_client():
+    api_key, base_url = get_gemini_key()
+    if base_url:
+        from google.genai import types
+        return genai.Client(api_key=api_key,
+                            http_options=types.HttpOptions(base_url=base_url, api_version=""))
+    return genai.Client(api_key=api_key)
+
+def ask_gemini(prompt: str) -> str:
+    client = get_gemini_client()
+    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+    return response.text or ""
+
+# ==================== Main App ====================
+if st.session_state.user:
     MAX_FREE_QUERIES = 10
+    user_email = st.session_state.user.email
 
-    # ==================== AI Client Setup ====================
-    # Reads from Streamlit secrets (Streamlit Cloud) or env vars (Replit)
-    def get_anthropic_key():
-        if "ANTHROPIC_API_KEY" in st.secrets:
-            return st.secrets["ANTHROPIC_API_KEY"], None
-        return (
-            os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY"),
-            os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL"),
-        )
-
-    def get_gemini_key():
-        if "GEMINI_API_KEY" in st.secrets:
-            return st.secrets["GEMINI_API_KEY"], None
-        return (
-            os.environ.get("AI_INTEGRATIONS_GEMINI_API_KEY"),
-            os.environ.get("AI_INTEGRATIONS_GEMINI_BASE_URL"),
-        )
-
-    @st.cache_resource
-    def get_claude(temperature: float = 0.3):
-        api_key, base_url = get_anthropic_key()
-        kwargs = dict(
-            model="claude-sonnet-4-5",
-            anthropic_api_key=api_key,
-            temperature=temperature,
-            max_tokens=8192,
-        )
-        if base_url:
-            kwargs["anthropic_api_url"] = base_url
-        return ChatAnthropic(**kwargs)
-
-    @st.cache_resource
-    def get_gemini_client():
-        api_key, base_url = get_gemini_key()
-        if base_url:
-            from google.genai import types
-            return genai.Client(
-                api_key=api_key,
-                http_options=types.HttpOptions(base_url=base_url, api_version=""),
-            )
-        return genai.Client(api_key=api_key)
-
-    def ask_gemini(prompt: str) -> str:
-        client = get_gemini_client()
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-        )
-        return response.text or ""
-
-    # ==================== Main App ====================
     st.title("🎼 AI Conductor")
     st.caption("One task → Multiple AIs → Best plan + execution")
 
@@ -128,57 +116,17 @@ elif authentication_status:
         st.write("3. Agents compete (Code + Planning)")
         st.write("4. You get the best combined result")
         st.divider()
-        st.metric("Your Usage", f"{st.session_state.usage_count} / {MAX_FREE_QUERIES} queries")
+        st.caption(f"Signed in as **{user_email}**")
+        st.metric("Usage Today", f"{st.session_state.usage_count} / {MAX_FREE_QUERIES} queries")
         if st.button("🗑️ Clear conversation"):
             st.session_state.messages = []
             st.rerun()
-        authenticator.logout('Logout', 'sidebar')
-        st.divider()
-
-        # ── Admin Panel (only shown to 'admin' user) ──
-        username = st.session_state.get("username")
-        if username == "admin":
-            with st.expander("👤 User Management"):
-                try:
-                    from supabase_auth import list_users, add_user, delete_user
-                    tab_list, tab_add, tab_del = st.tabs(["Users", "Add", "Remove"])
-
-                    with tab_list:
-                        users = list_users()
-                        if users:
-                            for u in users:
-                                st.write(f"**{u['username']}** — {u['name']} ({u['email']})")
-                        else:
-                            st.info("No users found.")
-
-                    with tab_add:
-                        new_uname = st.text_input("Username", key="add_uname")
-                        new_name = st.text_input("Display name", key="add_name")
-                        new_email = st.text_input("Email", key="add_email")
-                        new_pass = st.text_input("Password", type="password", key="add_pass")
-                        if st.button("Add user"):
-                            if new_uname and new_name and new_email and new_pass:
-                                add_user(new_uname, new_name, new_email, new_pass)
-                                st.success(f"User '{new_uname}' added.")
-                                st.cache_data.clear()
-                                st.rerun()
-                            else:
-                                st.warning("Please fill in all fields.")
-
-                    with tab_del:
-                        del_uname = st.text_input("Username to remove", key="del_uname")
-                        if st.button("Remove user", type="primary"):
-                            if del_uname and del_uname != "admin":
-                                delete_user(del_uname)
-                                st.success(f"User '{del_uname}' removed.")
-                                st.cache_data.clear()
-                                st.rerun()
-                            elif del_uname == "admin":
-                                st.error("Cannot remove the admin user.")
-                            else:
-                                st.warning("Enter a username to remove.")
-                except Exception as e:
-                    st.error(f"User management unavailable: {e}")
+        if st.button("🚪 Log Out"):
+            supabase.auth.sign_out()
+            st.session_state.user = None
+            st.session_state.messages = []
+            st.session_state.usage_count = 0
+            st.rerun()
 
     if st.session_state.usage_count >= MAX_FREE_QUERIES:
         st.warning(f"You've reached the free limit ({MAX_FREE_QUERIES} queries). Upgrade coming soon!")
@@ -217,7 +165,7 @@ elif authentication_status:
                         if "429" in str(gemini_err) or "RESOURCE_EXHAUSTED" in str(gemini_err):
                             status2.update(label="⚠️ Gemini quota exceeded — continuing with Claude only")
                         else:
-                            status2.update(label=f"⚠️ Gemini unavailable — continuing with Claude only")
+                            status2.update(label="⚠️ Gemini unavailable — continuing with Claude only")
 
                 status3 = st.status("🎼 Synthesizing plan...", expanded=True)
                 with status3:
@@ -271,7 +219,6 @@ elif authentication_status:
 
 **Recommended Next Step:** Save the code above and run it!
 """
-                # Download instead of file write (Streamlit Cloud is read-only)
                 st.download_button(
                     label="⬇️ Download result as Markdown",
                     data=f"# Question\n{prompt}\n\n{final}",
@@ -284,3 +231,6 @@ elif authentication_status:
             except Exception as e:
                 st.error(f"❌ Something went wrong: {e}")
                 st.session_state.usage_count = max(0, st.session_state.usage_count - 1)
+
+else:
+    show_auth()

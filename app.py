@@ -1,7 +1,5 @@
 import streamlit as st
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
+from supabase import create_client, Client
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
@@ -11,159 +9,126 @@ from pathlib import Path
 
 st.set_page_config(page_title="AI Conductor", page_icon="🎼", layout="centered")
 
-# ==================== Authentication Setup ====================
-COOKIE_NAME = os.environ.get("COOKIE_NAME", "ai_conductor_auth")
-COOKIE_KEY = os.environ.get("COOKIE_KEY", "ai_conductor_secret_key_change_me")
-COOKIE_EXPIRY = int(os.environ.get("COOKIE_EXPIRY_DAYS", "30"))
+# ==================== Supabase Setup ====================
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_ANON_KEY")
 
-@st.cache_data(ttl=60)
-def load_credentials():
-    try:
-        from supabase_auth import load_credentials_from_supabase
-        return load_credentials_from_supabase()
-    except Exception:
-        config_path = Path(__file__).parent / "config.yaml"
-        if config_path.exists():
-            with open(config_path) as f:
-                cfg = yaml.load(f, SafeLoader)
-            return cfg.get("credentials", {"usernames": {}})
-        return {"usernames": {}}
+if not supabase_url or not supabase_key:
+    st.error("Supabase credentials not found. Add SUPABASE_URL and SUPABASE_ANON_KEY to secrets.")
+    st.stop()
 
-credentials = load_credentials()
+supabase: Client = create_client(supabase_url, supabase_key)
 
-authenticator = stauth.Authenticate(
-    credentials,
-    COOKIE_NAME,
-    COOKIE_KEY,
-    COOKIE_EXPIRY,
-)
+# ==================== Session State ====================
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "usage_count" not in st.session_state:
+    st.session_state.usage_count = 0
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-authenticator.login()
+# ==================== Auth UI ====================
+def show_auth():
+    st.title("🎼 AI Conductor")
+    st.caption("One task → Multiple AIs → Best plan + execution")
+    st.divider()
 
-name = st.session_state.get("name")
-authentication_status = st.session_state.get("authentication_status")
-username = st.session_state.get("username")
+    tab_login, tab_signup = st.tabs(["Log In", "Sign Up"])
 
-if authentication_status is False:
-    st.error('Username/password is incorrect')
+    with tab_login:
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_pw")
+        if st.button("Log In", use_container_width=True):
+            try:
+                response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                if response.user:
+                    st.session_state.user = response.user
+                    st.rerun()
+                else:
+                    st.error("Login failed.")
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
 
-elif authentication_status is None:
-    st.warning('Please enter your username and password')
+    with tab_signup:
+        new_email = st.text_input("Email", key="signup_email")
+        new_password = st.text_input("Password", type="password", key="signup_pw")
+        confirm_pw = st.text_input("Confirm Password", type="password", key="signup_confirm")
+        if st.button("Create Account", use_container_width=True):
+            if new_password != confirm_pw:
+                st.error("Passwords don't match.")
+            elif len(new_password) < 8:
+                st.error("Password must be at least 8 characters.")
+            else:
+                try:
+                    response = supabase.auth.sign_up({"email": new_email, "password": new_password})
+                    if response.user:
+                        st.success("Account created! Check your email to confirm, then log in.")
+                    else:
+                        st.error("Sign up failed — email may already be in use.")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
-elif authentication_status:
-    st.success(f"Welcome, {name}!")
+# ==================== AI Clients ====================
+@st.cache_resource
+def get_claude(temperature: float = 0.3):
+    return ChatAnthropic(
+        model="claude-sonnet-4-6",
+        anthropic_api_url=os.environ["AI_INTEGRATIONS_ANTHROPIC_BASE_URL"],
+        anthropic_api_key=os.environ["AI_INTEGRATIONS_ANTHROPIC_API_KEY"],
+        temperature=temperature,
+        max_tokens=8192,
+    )
 
-    # ==================== Usage Counter (per user) ====================
-    if 'usage_count' not in st.session_state:
-        st.session_state.usage_count = 0
+@st.cache_resource
+def get_gemini_client():
+    return genai.Client(
+        api_key=os.environ["AI_INTEGRATIONS_GEMINI_API_KEY"],
+        http_options=types.HttpOptions(
+            base_url=os.environ["AI_INTEGRATIONS_GEMINI_BASE_URL"],
+            api_version="",
+        ),
+    )
 
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
+def ask_gemini(prompt: str) -> str:
+    client = get_gemini_client()
+    response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+    return response.text or ""
 
-    # Limit: 10 free queries per session
+# ==================== Main App ====================
+if st.session_state.user:
     MAX_FREE_QUERIES = 10
+    user_email = st.session_state.user.email
 
-    # ==================== Main App ====================
     st.title("🎼 AI Conductor")
     st.caption("One task → Multiple AIs → Best plan + execution")
 
-    @st.cache_resource
-    def get_claude(temperature: float = 0.3):
-        return ChatAnthropic(
-            model="claude-sonnet-4-6",
-            anthropic_api_url=os.environ["AI_INTEGRATIONS_ANTHROPIC_BASE_URL"],
-            anthropic_api_key=os.environ["AI_INTEGRATIONS_ANTHROPIC_API_KEY"],
-            temperature=temperature,
-            max_tokens=8192,
-        )
-
-    @st.cache_resource
-    def get_gemini_client():
-        return genai.Client(
-            api_key=os.environ["AI_INTEGRATIONS_GEMINI_API_KEY"],
-            http_options=types.HttpOptions(
-                base_url=os.environ["AI_INTEGRATIONS_GEMINI_BASE_URL"],
-                api_version="",
-            ),
-        )
-
-    def ask_gemini(prompt: str) -> str:
-        client = get_gemini_client()
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-        return response.text or ""
-
-    # Sidebar
     with st.sidebar:
         st.header("How it works")
         st.write("1. Multiple AIs answer your question")
         st.write("2. Conductor creates one strong plan")
         st.write("3. Agents compete (Code + Planning)")
-        st.write("4. You get the best combined result + downloadable file")
+        st.write("4. You get the best combined result")
         st.divider()
-        st.metric("Your Usage Today", f"{st.session_state.usage_count} / {MAX_FREE_QUERIES} queries")
+        st.caption(f"Signed in as **{user_email}**")
+        st.metric("Usage Today", f"{st.session_state.usage_count} / {MAX_FREE_QUERIES} queries")
         if st.button("🗑️ Clear conversation"):
             st.session_state.messages = []
             st.rerun()
-        authenticator.logout('Logout', 'sidebar')
-        st.divider()
-
-        # ── Admin Panel (only shown to 'admin' user) ──
-        if username == "admin":
-            with st.expander("👤 User Management"):
-                try:
-                    from supabase_auth import list_users, add_user, delete_user
-                    tab_list, tab_add, tab_del = st.tabs(["Users", "Add", "Remove"])
-
-                    with tab_list:
-                        users = list_users()
-                        if users:
-                            for u in users:
-                                st.write(f"**{u['username']}** — {u['name']} ({u['email']})")
-                        else:
-                            st.info("No users found.")
-
-                    with tab_add:
-                        new_uname = st.text_input("Username", key="add_uname")
-                        new_name = st.text_input("Display name", key="add_name")
-                        new_email = st.text_input("Email", key="add_email")
-                        new_pass = st.text_input("Password", type="password", key="add_pass")
-                        if st.button("Add user"):
-                            if new_uname and new_name and new_email and new_pass:
-                                add_user(new_uname, new_name, new_email, new_pass)
-                                st.success(f"User '{new_uname}' added.")
-                                st.cache_data.clear()
-                                st.rerun()
-                            else:
-                                st.warning("Please fill in all fields.")
-
-                    with tab_del:
-                        del_uname = st.text_input("Username to remove", key="del_uname")
-                        if st.button("Remove user", type="primary"):
-                            if del_uname and del_uname != "admin":
-                                delete_user(del_uname)
-                                st.success(f"User '{del_uname}' removed.")
-                                st.cache_data.clear()
-                                st.rerun()
-                            elif del_uname == "admin":
-                                st.error("Cannot remove the admin user.")
-                            else:
-                                st.warning("Enter a username to remove.")
-                except Exception as e:
-                    st.error(f"User management unavailable: {e}")
+        if st.button("🚪 Log Out"):
+            supabase.auth.sign_out()
+            st.session_state.user = None
+            st.session_state.messages = []
+            st.session_state.usage_count = 0
+            st.rerun()
 
     if st.session_state.usage_count >= MAX_FREE_QUERIES:
         st.warning(f"You've reached the free limit ({MAX_FREE_QUERIES} queries). Upgrade coming soon!")
         st.stop()
 
-    # Chat history
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # User input
     if prompt := st.chat_input("What would you like to build or solve?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -176,7 +141,6 @@ elif authentication_status:
                 claude = get_claude(temperature=0.3)
                 synthesizer = get_claude(temperature=0.2)
 
-                # --- Step 1: Gather raw answers ---
                 status = st.status("🤖 Asking Claude...", expanded=True)
                 with status:
                     raw_claude = claude.invoke(prompt).content
@@ -196,7 +160,6 @@ elif authentication_status:
                         else:
                             status2.update(label="⚠️ Gemini unavailable — continuing with Claude only")
 
-                # --- Step 2: Synthesize plan (show immediately) ---
                 status3 = st.status("🎼 Synthesizing plan...", expanded=True)
                 with status3:
                     if gemini_available:
@@ -214,7 +177,6 @@ elif authentication_status:
                 st.markdown("**📋 Synthesized Plan:**")
                 st.write(plan)
 
-                # --- Step 3: Run agents ---
                 status4 = st.status("💻 Running Code Agent...", expanded=True)
                 with status4:
                     code_agent = synthesizer.invoke([
@@ -250,7 +212,6 @@ elif authentication_status:
 
 **Recommended Next Step:** Save the code above and run it!
 """
-
                 with open(Path(__file__).parent / "conductor_result.md", "w", encoding="utf-8") as f:
                     f.write(f"# Question\n{prompt}\n\n{final}")
 
@@ -261,3 +222,6 @@ elif authentication_status:
             except Exception as e:
                 st.error(f"❌ Something went wrong: {e}")
                 st.session_state.usage_count = max(0, st.session_state.usage_count - 1)
+
+else:
+    show_auth()
