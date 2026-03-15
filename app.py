@@ -9,20 +9,33 @@ from google.genai import types
 import os
 from pathlib import Path
 
-# Resolve config.yaml relative to this file, regardless of working directory
-CONFIG_PATH = Path(__file__).parent / "config.yaml"
-
 st.set_page_config(page_title="AI Conductor", page_icon="🎼", layout="centered")
 
 # ==================== Authentication Setup ====================
-with open(CONFIG_PATH) as file:
-    config = yaml.load(file, Loader=SafeLoader)
+COOKIE_NAME = os.environ.get("COOKIE_NAME", "ai_conductor_auth")
+COOKIE_KEY = os.environ.get("COOKIE_KEY", "ai_conductor_secret_key_change_me")
+COOKIE_EXPIRY = int(os.environ.get("COOKIE_EXPIRY_DAYS", "30"))
+
+@st.cache_data(ttl=60)
+def load_credentials():
+    try:
+        from supabase_auth import load_credentials_from_supabase
+        return load_credentials_from_supabase()
+    except Exception:
+        config_path = Path(__file__).parent / "config.yaml"
+        if config_path.exists():
+            with open(config_path) as f:
+                cfg = yaml.load(f, SafeLoader)
+            return cfg.get("credentials", {"usernames": {}})
+        return {"usernames": {}}
+
+credentials = load_credentials()
 
 authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days'],
+    credentials,
+    COOKIE_NAME,
+    COOKIE_KEY,
+    COOKIE_EXPIRY,
 )
 
 authenticator.login()
@@ -95,6 +108,51 @@ elif authentication_status:
             st.session_state.messages = []
             st.rerun()
         authenticator.logout('Logout', 'sidebar')
+        st.divider()
+
+        # ── Admin Panel (only shown to 'admin' user) ──
+        if username == "admin":
+            with st.expander("👤 User Management"):
+                try:
+                    from supabase_auth import list_users, add_user, delete_user
+                    tab_list, tab_add, tab_del = st.tabs(["Users", "Add", "Remove"])
+
+                    with tab_list:
+                        users = list_users()
+                        if users:
+                            for u in users:
+                                st.write(f"**{u['username']}** — {u['name']} ({u['email']})")
+                        else:
+                            st.info("No users found.")
+
+                    with tab_add:
+                        new_uname = st.text_input("Username", key="add_uname")
+                        new_name = st.text_input("Display name", key="add_name")
+                        new_email = st.text_input("Email", key="add_email")
+                        new_pass = st.text_input("Password", type="password", key="add_pass")
+                        if st.button("Add user"):
+                            if new_uname and new_name and new_email and new_pass:
+                                add_user(new_uname, new_name, new_email, new_pass)
+                                st.success(f"User '{new_uname}' added.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.warning("Please fill in all fields.")
+
+                    with tab_del:
+                        del_uname = st.text_input("Username to remove", key="del_uname")
+                        if st.button("Remove user", type="primary"):
+                            if del_uname and del_uname != "admin":
+                                delete_user(del_uname)
+                                st.success(f"User '{del_uname}' removed.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            elif del_uname == "admin":
+                                st.error("Cannot remove the admin user.")
+                            else:
+                                st.warning("Enter a username to remove.")
+                except Exception as e:
+                    st.error(f"User management unavailable: {e}")
 
     if st.session_state.usage_count >= MAX_FREE_QUERIES:
         st.warning(f"You've reached the free limit ({MAX_FREE_QUERIES} queries). Upgrade coming soon!")

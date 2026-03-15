@@ -11,28 +11,40 @@ import os
 st.set_page_config(page_title="AI Conductor", page_icon="🎼", layout="centered")
 
 # ==================== Authentication Setup ====================
-# Supports both Streamlit Cloud (st.secrets) and local config.yaml
+COOKIE_NAME = st.secrets.get("COOKIE_NAME", "ai_conductor_auth") if hasattr(st, "secrets") else "ai_conductor_auth"
+COOKIE_KEY = st.secrets.get("COOKIE_KEY", "ai_conductor_secret_key_change_me") if hasattr(st, "secrets") else "ai_conductor_secret_key_change_me"
+COOKIE_EXPIRY = int(st.secrets.get("COOKIE_EXPIRY_DAYS", 30)) if hasattr(st, "secrets") else 30
 
-def load_auth_config():
-    if "credentials" in st.secrets:
-        return {
-            "credentials": st.secrets["credentials"].to_dict(),
-            "cookie": st.secrets["cookie"].to_dict(),
-        }
+@st.cache_data(ttl=60)
+def load_credentials():
+    # 1. Try Supabase first
+    try:
+        from supabase_auth import load_credentials_from_supabase
+        return load_credentials_from_supabase()
+    except Exception:
+        pass
+    # 2. Fall back to Streamlit secrets credentials block
+    try:
+        if "credentials" in st.secrets:
+            return st.secrets["credentials"].to_dict()
+    except Exception:
+        pass
+    # 3. Fall back to config.yaml
     config_path = Path(__file__).parent / "config.yaml"
     if config_path.exists():
         with open(config_path) as f:
-            return yaml.load(f, Loader=SafeLoader)
-    st.error("No authentication config found. Add credentials to Streamlit secrets or provide config.yaml.")
+            cfg = yaml.load(f, SafeLoader)
+        return cfg.get("credentials", {"usernames": {}})
+    st.error("No authentication config found. Set up Supabase or add a config.yaml.")
     st.stop()
 
-config = load_auth_config()
+credentials = load_credentials()
 
 authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days'],
+    credentials,
+    COOKIE_NAME,
+    COOKIE_KEY,
+    COOKIE_EXPIRY,
 )
 
 authenticator.login()
@@ -121,6 +133,52 @@ elif authentication_status:
             st.session_state.messages = []
             st.rerun()
         authenticator.logout('Logout', 'sidebar')
+        st.divider()
+
+        # ── Admin Panel (only shown to 'admin' user) ──
+        username = st.session_state.get("username")
+        if username == "admin":
+            with st.expander("👤 User Management"):
+                try:
+                    from supabase_auth import list_users, add_user, delete_user
+                    tab_list, tab_add, tab_del = st.tabs(["Users", "Add", "Remove"])
+
+                    with tab_list:
+                        users = list_users()
+                        if users:
+                            for u in users:
+                                st.write(f"**{u['username']}** — {u['name']} ({u['email']})")
+                        else:
+                            st.info("No users found.")
+
+                    with tab_add:
+                        new_uname = st.text_input("Username", key="add_uname")
+                        new_name = st.text_input("Display name", key="add_name")
+                        new_email = st.text_input("Email", key="add_email")
+                        new_pass = st.text_input("Password", type="password", key="add_pass")
+                        if st.button("Add user"):
+                            if new_uname and new_name and new_email and new_pass:
+                                add_user(new_uname, new_name, new_email, new_pass)
+                                st.success(f"User '{new_uname}' added.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.warning("Please fill in all fields.")
+
+                    with tab_del:
+                        del_uname = st.text_input("Username to remove", key="del_uname")
+                        if st.button("Remove user", type="primary"):
+                            if del_uname and del_uname != "admin":
+                                delete_user(del_uname)
+                                st.success(f"User '{del_uname}' removed.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            elif del_uname == "admin":
+                                st.error("Cannot remove the admin user.")
+                            else:
+                                st.warning("Enter a username to remove.")
+                except Exception as e:
+                    st.error(f"User management unavailable: {e}")
 
     if st.session_state.usage_count >= MAX_FREE_QUERIES:
         st.warning(f"You've reached the free limit ({MAX_FREE_QUERIES} queries). Upgrade coming soon!")
