@@ -149,14 +149,29 @@ elif authentication_status:
 
                 status2 = st.status("✨ Asking Gemini...", expanded=True)
                 with status2:
-                    raw_gemini = ask_gemini(prompt)
-                    status2.update(label="✅ Gemini answered")
+                    try:
+                        raw_gemini = ask_gemini(prompt)
+                        status2.update(label="✅ Gemini answered")
+                        gemini_available = True
+                    except Exception as gemini_err:
+                        raw_gemini = ""
+                        gemini_available = False
+                        if "429" in str(gemini_err) or "RESOURCE_EXHAUSTED" in str(gemini_err):
+                            status2.update(label="⚠️ Gemini quota exceeded — continuing with Claude only")
+                        else:
+                            status2.update(label=f"⚠️ Gemini unavailable — continuing with Claude only")
 
                 status3 = st.status("🎼 Synthesizing plan...", expanded=True)
                 with status3:
+                    if gemini_available:
+                        synth_context = f"Task: {prompt}\n\nClaude: {raw_claude}\n\nGemini: {raw_gemini}"
+                        synth_instruction = "Create one clear, actionable plan by combining the best parts of both responses."
+                    else:
+                        synth_context = f"Task: {prompt}\n\nClaude: {raw_claude}"
+                        synth_instruction = "Create one clear, actionable plan based on this response."
                     plan = synthesizer.invoke([
-                        SystemMessage(content="Create one clear, actionable plan by combining the best parts."),
-                        HumanMessage(content=f"Task: {prompt}\n\nClaude: {raw_claude}\n\nGemini: {raw_gemini}"),
+                        SystemMessage(content=synth_instruction),
+                        HumanMessage(content=synth_context),
                     ]).content
                     status3.update(label="✅ Plan ready")
 
