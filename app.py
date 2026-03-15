@@ -23,8 +23,8 @@ supabase: Client = create_client(supabase_url, supabase_key)
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
 # ==================== Stripe Price IDs ====================
-STRIPE_PRO_PRICE_ID   = "price_1TBMFdF454Yi4ROE9JrsRpZu"   # $9/month subscription
-STRIPE_PACK_PRICE_ID  = "price_1TBMFdF454Yi4ROEwiYLjaPo"   # $5 one-time / 100 queries
+STRIPE_BASIC_PRICE_ID = "price_1TBMRNFC68YihsMHbAOq7jGj"  # $9/month — Basic
+STRIPE_PRO_PRICE_ID   = "price_1TBMROFC68YihsMHDom1cias"  # $29/month — Pro
 
 # ==================== Session State ====================
 if "user" not in st.session_state:
@@ -152,13 +152,26 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
         st.caption("You'll be taken to Stripe's hosted checkout. Return here after payment.")
         st.stop()
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown("### 🚀 Pro Plan")
+        st.markdown("### ⚡ Basic")
         st.markdown("**$9 / month**")
-        st.markdown("- Unlimited AI queries\n- All 4 AI models\n- Priority processing\n- Download results\n- Cancel anytime")
-        if st.button("Get Pro — $9/month", use_container_width=True, key="buy_pro"):
+        st.markdown("- 500 queries / month\n- All 4 AI models\n- Basic agents\n- Download results\n- Cancel anytime")
+        if st.button("Choose Basic — $9/mo", use_container_width=True, key="buy_basic"):
+            with st.spinner("Creating checkout..."):
+                try:
+                    url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
+                    st.session_state.checkout_url = url
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Payment setup error: {str(e)}")
+
+    with col2:
+        st.markdown("### 🚀 Pro")
+        st.markdown("**$29 / month**")
+        st.markdown("- 1,000+ queries / month\n- All 4 AI models\n- Custom agents\n- Priority processing\n- Cancel anytime")
+        if st.button("Choose Pro — $29/mo", use_container_width=True, key="buy_pro"):
             with st.spinner("Creating checkout..."):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -167,18 +180,12 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
                 except Exception as e:
                     st.error(f"Payment setup error: {str(e)}")
 
-    with col2:
-        st.markdown("### 📦 100 Query Pack")
-        st.markdown("**$5 one-time**")
-        st.markdown("- 100 extra queries\n- All 4 AI models\n- Never expires\n- Download results\n- No subscription")
-        if st.button("Buy 100 Extra Queries — $5", use_container_width=True, key="buy_pack"):
-            with st.spinner("Creating checkout..."):
-                try:
-                    url = create_stripe_session(STRIPE_PACK_PRICE_ID, "payment", user_email, user_id, 100)
-                    st.session_state.checkout_url = url
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Payment setup error: {str(e)}")
+    with col3:
+        st.markdown("### 🏢 Enterprise")
+        st.markdown("**Custom pricing**")
+        st.markdown("- Unlimited queries\n- API access\n- Dedicated support\n- Custom integrations\n- SLA guarantee")
+        if st.button("Contact Us", use_container_width=True, key="buy_enterprise"):
+            st.info("📧 Email us at **support@aiconductorapp.com** to discuss your needs.")
 
     st.divider()
     st.caption("Payments processed securely by Stripe. Test card: `4242 4242 4242 4242` · any future date · any CVC.")
@@ -278,10 +285,20 @@ if st.session_state.user:
         st.markdown("**🎼 AI Conductor**")
         st.caption(f"Signed in as **{user_email}**")
         st.divider()
-        st.header("Upgrade for More")
-        st.caption("Free tier: 10 queries. Unlock unlimited + priority models.")
+        st.header("Upgrade Your Plan")
+        st.caption("Free tier: 10 queries. Unlock more queries and features.")
 
-        if st.button("🚀 Get Pro — $9/month", use_container_width=True):
+        if st.button("⚡ Basic — $9/month", use_container_width=True):
+            with st.spinner("Setting up..."):
+                try:
+                    url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
+                    st.session_state.checkout_url = url
+                    st.session_state.page = "upgrade"
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
+
+        if st.button("🚀 Pro — $29/month", use_container_width=True):
             with st.spinner("Setting up..."):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -291,15 +308,8 @@ if st.session_state.user:
                 except Exception as e:
                     st.error(str(e))
 
-        if st.button("📦 100 Queries — $5 one-time", use_container_width=True):
-            with st.spinner("Setting up..."):
-                try:
-                    url = create_stripe_session(STRIPE_PACK_PRICE_ID, "payment", user_email, user_id, 100)
-                    st.session_state.checkout_url = url
-                    st.session_state.page = "upgrade"
-                    st.rerun()
-                except Exception as e:
-                    st.error(str(e))
+        if st.button("🏢 Enterprise — Contact Us", use_container_width=True):
+            st.info("📧 support@aiconductorapp.com")
 
         st.divider()
         credit_color = "🟢" if balance > 5 else ("🟡" if balance > 0 else "🔴")
@@ -328,9 +338,18 @@ if st.session_state.user:
 
     if balance <= 0:
         st.error("🔴 You're out of credits.")
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("🚀 Get Pro — $9/month", use_container_width=True):
+            if st.button("⚡ Basic — $9/mo", use_container_width=True):
+                try:
+                    url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
+                    st.session_state.checkout_url = url
+                    st.session_state.page = "upgrade"
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
+        with col2:
+            if st.button("🚀 Pro — $29/mo", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
                     st.session_state.checkout_url = url
@@ -338,15 +357,9 @@ if st.session_state.user:
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))
-        with col2:
-            if st.button("📦 Buy 100 Queries — $5", use_container_width=True):
-                try:
-                    url = create_stripe_session(STRIPE_PACK_PRICE_ID, "payment", user_email, user_id, 100)
-                    st.session_state.checkout_url = url
-                    st.session_state.page = "upgrade"
-                    st.rerun()
-                except Exception as e:
-                    st.error(str(e))
+        with col3:
+            if st.button("🏢 Enterprise", use_container_width=True):
+                st.info("📧 support@aiconductorapp.com")
         st.stop()
 
     for msg in st.session_state.messages:
