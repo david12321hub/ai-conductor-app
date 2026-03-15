@@ -5,7 +5,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
 from google.genai import types
 import requests
-import stripe as stripe_lib
+import stripe
 import os
 from pathlib import Path
 
@@ -20,38 +20,11 @@ if not supabase_url or not supabase_key:
     st.stop()
 
 supabase: Client = create_client(supabase_url, supabase_key)
-stripe_lib.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
-# ==================== Credit Packages ====================
-CREDIT_PACKAGES = [
-    {
-        "key": "starter",
-        "name": "Starter",
-        "emoji": "🥉",
-        "price_usd": "$5",
-        "price_cents": 500,
-        "credits": 50,
-        "features": ["50 credits", "All 4 AI models", "Download results"],
-    },
-    {
-        "key": "pro",
-        "name": "Pro",
-        "emoji": "🥈",
-        "price_usd": "$15",
-        "price_cents": 1500,
-        "credits": 200,
-        "features": ["200 credits", "All 4 AI models", "Download results", "Priority support"],
-    },
-    {
-        "key": "unlimited",
-        "name": "Unlimited",
-        "emoji": "🥇",
-        "price_usd": "$49",
-        "price_cents": 4900,
-        "credits": 9999,
-        "features": ["Unlimited credits", "All 4 AI models", "Download results", "Priority support", "Early features"],
-    },
-]
+# ==================== Stripe Price IDs ====================
+STRIPE_PRO_PRICE_ID   = "price_1TBMFdF454Yi4ROE9JrsRpZu"   # $9/month subscription
+STRIPE_PACK_PRICE_ID  = "price_1TBMFdF454Yi4ROEwiYLjaPo"   # $5 one-time / 100 queries
 
 # ==================== Session State ====================
 if "user" not in st.session_state:
@@ -62,8 +35,6 @@ if "page" not in st.session_state:
     st.session_state.page = "chat"
 if "checkout_url" not in st.session_state:
     st.session_state.checkout_url = None
-if "checkout_credits" not in st.session_state:
-    st.session_state.checkout_credits = 0
 
 # ==================== Credits Helpers ====================
 def get_credits(user_id: str) -> int:
@@ -76,23 +47,20 @@ def get_credits(user_id: str) -> int:
     except Exception:
         return 0
 
-def deduct_credit(user_id: str, balance: int) -> int:
-    new_balance = max(0, balance - 1)
+def set_credits(user_id: str, new_balance: int):
     try:
         supabase.table("credits").update({"balance": new_balance}).eq("user_id", user_id).execute()
     except Exception:
         pass
+
+def deduct_credit(user_id: str, balance: int) -> int:
+    new_balance = max(0, balance - 1)
+    set_credits(user_id, new_balance)
     return new_balance
 
 def add_credits(user_id: str, current_balance: int, amount: int) -> int:
-    if amount >= 9999:
-        new_balance = 9999
-    else:
-        new_balance = min(9999, current_balance + amount)
-    try:
-        supabase.table("credits").update({"balance": new_balance}).eq("user_id", user_id).execute()
-    except Exception:
-        pass
+    new_balance = min(9999, current_balance + amount) if amount < 9999 else 9999
+    set_credits(user_id, new_balance)
     return new_balance
 
 # ==================== Stripe Helpers ====================
@@ -106,34 +74,24 @@ def get_base_url() -> str:
     domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
     return f"https://{domain}" if domain else "http://localhost:8501"
 
-def create_checkout_session(package: dict, user_email: str, user_id: str) -> tuple[str, str]:
+def create_stripe_session(price_id: str, mode: str, user_email: str, user_id: str, credits_grant: int) -> str:
     base_url = get_base_url()
-    credits = package["credits"]
-    label = "Unlimited" if credits >= 9999 else str(credits)
-    session = stripe_lib.checkout.Session.create(
+    session = stripe.checkout.Session.create(
         payment_method_types=["card"],
-        line_items=[{
-            "price_data": {
-                "currency": "usd",
-                "unit_amount": package["price_cents"],
-                "product_data": {
-                    "name": f"AI Conductor — {package['name']} Pack",
-                    "description": f"{label} credits for AI Conductor",
-                },
-            },
-            "quantity": 1,
-        }],
-        mode="payment",
-        success_url=f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}&credits={credits}",
+        line_items=[{"price": price_id, "quantity": 1}],
+        mode=mode,
+        success_url=f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}&credits={credits_grant}&mode={mode}",
         cancel_url=f"{base_url}?payment=cancelled",
         customer_email=user_email,
-        metadata={"user_id": user_id, "credits": str(credits)},
+        client_reference_id=user_id,
     )
-    return session.id, session.url
+    return session.url
 
-def verify_stripe_session(session_id: str) -> bool:
+def verify_stripe_session(session_id: str, mode: str) -> bool:
     try:
-        session = stripe_lib.checkout.Session.retrieve(session_id)
+        session = stripe.checkout.Session.retrieve(session_id)
+        if mode == "subscription":
+            return session.status == "complete"
         return session.payment_status == "paid"
     except Exception:
         return False
@@ -181,43 +139,49 @@ def show_auth():
 
 # ==================== Upgrade Page ====================
 def show_upgrade(user_email: str, user_id: str, balance: int):
-    st.title("💳 Buy Credits")
-    st.caption(f"Current balance: **{balance} credit(s)**  •  Each query costs 1 credit")
+    st.title("💳 Upgrade for More")
+    st.caption(f"Current balance: **{balance} credit(s)**  •  Free tier: 10 queries. Unlock unlimited + priority models.")
     st.divider()
 
     if st.session_state.checkout_url:
-        st.success("Your payment session is ready!")
-        st.link_button(
-            "🔒 Complete Payment on Stripe",
-            st.session_state.checkout_url,
-            use_container_width=True,
-        )
+        st.success("Your secure checkout is ready!")
+        st.link_button("🔒 Pay securely with Stripe →", st.session_state.checkout_url, use_container_width=True)
         if st.button("← Choose a different plan"):
             st.session_state.checkout_url = None
-            st.session_state.checkout_credits = 0
             st.rerun()
-        st.caption("You'll be taken to Stripe's secure checkout. Return here after payment.")
+        st.caption("You'll be taken to Stripe's hosted checkout. Return here after payment.")
         st.stop()
 
-    cols = st.columns(3)
-    for col, pkg in zip(cols, CREDIT_PACKAGES):
-        with col:
-            st.markdown(f"### {pkg['emoji']} {pkg['name']}")
-            st.markdown(f"**{pkg['price_usd']}**")
-            for feature in pkg["features"]:
-                st.markdown(f"- {feature}")
-            if st.button(f"Buy {pkg['name']}", use_container_width=True, key=f"buy_{pkg['key']}"):
-                with st.spinner("Creating secure checkout..."):
-                    try:
-                        session_id, checkout_url = create_checkout_session(pkg, user_email, user_id)
-                        st.session_state.checkout_url = checkout_url
-                        st.session_state.checkout_credits = pkg["credits"]
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Could not create payment session: {e}")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### 🚀 Pro Plan")
+        st.markdown("**$9 / month**")
+        st.markdown("- Unlimited AI queries\n- All 4 AI models\n- Priority processing\n- Download results\n- Cancel anytime")
+        if st.button("Get Pro — $9/month", use_container_width=True, key="buy_pro"):
+            with st.spinner("Creating checkout..."):
+                try:
+                    url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
+                    st.session_state.checkout_url = url
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Payment setup error: {str(e)}")
+
+    with col2:
+        st.markdown("### 📦 100 Query Pack")
+        st.markdown("**$5 one-time**")
+        st.markdown("- 100 extra queries\n- All 4 AI models\n- Never expires\n- Download results\n- No subscription")
+        if st.button("Buy 100 Extra Queries — $5", use_container_width=True, key="buy_pack"):
+            with st.spinner("Creating checkout..."):
+                try:
+                    url = create_stripe_session(STRIPE_PACK_PRICE_ID, "payment", user_email, user_id, 100)
+                    st.session_state.checkout_url = url
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Payment setup error: {str(e)}")
 
     st.divider()
-    st.caption("Payments are processed securely by Stripe. All major cards accepted.")
+    st.caption("Payments processed securely by Stripe. Test card: `4242 4242 4242 4242` · any future date · any CVC.")
     if st.button("← Back to Chat"):
         st.session_state.page = "chat"
         st.rerun()
@@ -245,8 +209,7 @@ def get_gemini_client():
 
 def ask_gemini(prompt: str) -> str:
     client = get_gemini_client()
-    response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-    return response.text or ""
+    return client.models.generate_content(model="gemini-2.5-flash", contents=prompt).text or ""
 
 def ask_cohere(prompt: str) -> str:
     api_key = os.environ.get("COHERE_API_KEY", "")
@@ -285,26 +248,27 @@ def call_ai_safely(name: str, fn, prompt: str, status_widget):
 
 # ==================== Main App ====================
 if st.session_state.user:
-    user_id = st.session_state.user.id
+    user_id    = st.session_state.user.id
     user_email = st.session_state.user.email
-    balance = get_credits(user_id)
+    balance    = get_credits(user_id)
 
-    # ---- Handle Stripe redirect back ----
+    # ---- Handle Stripe redirect ----
     params = st.query_params
     if params.get("payment") == "success":
-        session_id = params.get("session_id", "")
+        session_id     = params.get("session_id", "")
         credits_to_add = int(params.get("credits", "0"))
-        if session_id and credits_to_add > 0:
-            if verify_stripe_session(session_id):
-                balance = add_credits(user_id, balance, credits_to_add)
-                st.session_state.checkout_url = None
-                st.session_state.checkout_credits = 0
-                st.query_params.clear()
-                label = "Unlimited" if credits_to_add >= 9999 else str(credits_to_add)
-                st.success(f"🎉 Payment successful! {label} credits added. New balance: **{balance}**")
+        mode           = params.get("mode", "payment")
+        if session_id and verify_stripe_session(session_id, mode):
+            balance = add_credits(user_id, balance, credits_to_add)
+            st.session_state.checkout_url = None
+            st.query_params.clear()
+            if credits_to_add >= 9999:
+                st.success("🎉 Pro subscription activated! Unlimited queries unlocked.")
             else:
-                st.query_params.clear()
-                st.warning("Payment could not be verified. Contact support if you were charged.")
+                st.success(f"🎉 Payment successful! {credits_to_add} credits added. Balance: **{balance}**")
+        elif session_id:
+            st.query_params.clear()
+            st.warning("Payment could not be verified. Contact support if you were charged.")
     elif params.get("payment") == "cancelled":
         st.query_params.clear()
         st.info("Payment cancelled — no charge was made.")
@@ -314,20 +278,37 @@ if st.session_state.user:
         st.markdown("**🎼 AI Conductor**")
         st.caption(f"Signed in as **{user_email}**")
         st.divider()
+        st.header("Upgrade for More")
+        st.caption("Free tier: 10 queries. Unlock unlimited + priority models.")
 
+        if st.button("🚀 Get Pro — $9/month", use_container_width=True):
+            with st.spinner("Setting up..."):
+                try:
+                    url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
+                    st.session_state.checkout_url = url
+                    st.session_state.page = "upgrade"
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
+
+        if st.button("📦 100 Queries — $5 one-time", use_container_width=True):
+            with st.spinner("Setting up..."):
+                try:
+                    url = create_stripe_session(STRIPE_PACK_PRICE_ID, "payment", user_email, user_id, 100)
+                    st.session_state.checkout_url = url
+                    st.session_state.page = "upgrade"
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
+
+        st.divider()
         credit_color = "🟢" if balance > 5 else ("🟡" if balance > 0 else "🔴")
         st.metric("Credits", f"{credit_color} {balance}")
-
-        if st.button("💳 Buy More Credits", use_container_width=True):
-            st.session_state.page = "upgrade"
-            st.rerun()
-
         st.divider()
         st.markdown("**Active AI Models:**")
         st.write("🤖 Claude · ✨ Gemini")
         st.write("🟣 Cohere · 🟠 Mistral")
         st.divider()
-
         if st.button("🗑️ Clear conversation"):
             st.session_state.messages = []
             st.rerun()
@@ -347,10 +328,25 @@ if st.session_state.user:
 
     if balance <= 0:
         st.error("🔴 You're out of credits.")
-        st.markdown("Upgrade your plan to keep using AI Conductor.")
-        if st.button("💳 View Plans & Buy Credits", use_container_width=True):
-            st.session_state.page = "upgrade"
-            st.rerun()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🚀 Get Pro — $9/month", use_container_width=True):
+                try:
+                    url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
+                    st.session_state.checkout_url = url
+                    st.session_state.page = "upgrade"
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
+        with col2:
+            if st.button("📦 Buy 100 Queries — $5", use_container_width=True):
+                try:
+                    url = create_stripe_session(STRIPE_PACK_PRICE_ID, "payment", user_email, user_id, 100)
+                    st.session_state.checkout_url = url
+                    st.session_state.page = "upgrade"
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
         st.stop()
 
     for msg in st.session_state.messages:
@@ -364,7 +360,7 @@ if st.session_state.user:
 
         with st.chat_message("assistant"):
             try:
-                claude = get_claude(temperature=0.3)
+                claude      = get_claude(temperature=0.3)
                 synthesizer = get_claude(temperature=0.2)
 
                 s1 = st.status("🤖 Asking Claude...", expanded=False)
@@ -387,27 +383,21 @@ if st.session_state.user:
                 s5 = st.status("🎼 Synthesizing plan from all AIs...", expanded=False)
                 with s5:
                     responses = [f"Claude:\n{raw_claude}"]
-                    if gemini_ok:
-                        responses.append(f"Gemini:\n{raw_gemini}")
-                    if cohere_ok:
-                        responses.append(f"Cohere:\n{raw_cohere}")
-                    if mistral_ok:
-                        responses.append(f"Mistral:\n{raw_mistral}")
+                    if gemini_ok:  responses.append(f"Gemini:\n{raw_gemini}")
+                    if cohere_ok:  responses.append(f"Cohere:\n{raw_cohere}")
+                    if mistral_ok: responses.append(f"Mistral:\n{raw_mistral}")
                     ai_count = len(responses)
-                    synth_context = f"Task: {prompt}\n\n" + "\n\n".join(responses)
-                    synth_instruction = (
-                        f"You received {ai_count} AI responses to the same task. "
-                        "Synthesize the best ideas from all of them into one clear, actionable, well-structured plan. "
-                        "Do not simply pick one — combine the strongest insights from each."
-                    )
                     plan = synthesizer.invoke([
-                        SystemMessage(content=synth_instruction),
-                        HumanMessage(content=synth_context),
+                        SystemMessage(content=(
+                            f"You received {ai_count} AI responses to the same task. "
+                            "Synthesize the best ideas from all of them into one clear, actionable, well-structured plan. "
+                            "Do not simply pick one — combine the strongest insights from each."
+                        )),
+                        HumanMessage(content=f"Task: {prompt}\n\n" + "\n\n".join(responses)),
                     ]).content
                     s5.update(label=f"✅ Plan synthesized from {ai_count} AI response(s)")
 
                 balance = deduct_credit(user_id, balance)
-
                 st.markdown("**📋 Synthesized Plan:**")
                 st.write(plan)
 
@@ -433,25 +423,17 @@ if st.session_state.user:
                 active_ais = (["Claude"] + (["Gemini"] if gemini_ok else []) +
                               (["Cohere"] if cohere_ok else []) + (["Mistral"] if mistral_ok else []))
 
-                final = f"""**Final Result** *(synthesized from {", ".join(active_ais)})*
-
-**Plan Summary:**
-{plan}
-
-**Code Agent Output:**
-```python
-{code_agent}
-```
-
-**Planning Agent Output:**
-{planning_agent}
-
-**Recommended Next Step:** Save the code above and run it!
-"""
+                final = (
+                    f"**Final Result** *(synthesized from {', '.join(active_ais)})*\n\n"
+                    f"**Plan Summary:**\n{plan}\n\n"
+                    f"**Code Agent Output:**\n```python\n{code_agent}\n```\n\n"
+                    f"**Planning Agent Output:**\n{planning_agent}\n\n"
+                    f"**Recommended Next Step:** Save the code above and run it!\n"
+                )
                 with open(Path(__file__).parent / "conductor_result.md", "w", encoding="utf-8") as f:
                     f.write(f"# Question\n{prompt}\n\n{final}")
 
-                st.success(f"✅ Done! Used {len(active_ais)} AI(s): {', '.join(active_ais)} · Credits remaining: {balance}")
+                st.success(f"✅ Done! {', '.join(active_ais)} · Credits remaining: {balance}")
                 st.session_state.messages.append({"role": "assistant", "content": final})
 
             except Exception as e:
