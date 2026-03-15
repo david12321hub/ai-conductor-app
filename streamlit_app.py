@@ -46,9 +46,15 @@ def supabase_signup(email: str, password: str):
         json={"email": email, "password": password},
         timeout=10,
     )
+    data = r.json()
     if r.status_code == 200:
-        return r.json().get("user"), None
-    return None, r.json().get("error_description", r.json().get("msg", "Sign up failed."))
+        # Signup returns user object directly (not nested under "user" key like login)
+        user = data if data.get("id") else data.get("user")
+        if user:
+            return user, None
+        # Email already registered (Supabase returns 200 with empty user to prevent enumeration)
+        return None, "This email is already registered. Please log in instead."
+    return None, data.get("error_description", data.get("msg", data.get("error", "Sign up failed.")))
 
 # ==================== Credits Helpers ====================
 def get_credits(user_id: str) -> int:
