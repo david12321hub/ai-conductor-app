@@ -4,6 +4,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
 from google.genai import types
+import requests
 import os
 from pathlib import Path
 
@@ -94,20 +95,61 @@ def ask_gemini(prompt: str) -> str:
     response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
     return response.text or ""
 
+def ask_cohere(prompt: str) -> str:
+    api_key = os.environ.get("COHERE_API_KEY", "")
+    if not api_key:
+        raise ValueError("COHERE_API_KEY not set")
+    r = requests.post(
+        "https://api.cohere.com/v2/chat",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": "command-r-plus-08-2024", "messages": [{"role": "user", "content": prompt}]},
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["message"]["content"][0]["text"]
+
+def ask_mistral(prompt: str) -> str:
+    api_key = os.environ.get("MISTRAL_API_KEY", "")
+    if not api_key:
+        raise ValueError("MISTRAL_API_KEY not set")
+    r = requests.post(
+        "https://api.mistral.ai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": "mistral-large-latest", "messages": [{"role": "user", "content": prompt}]},
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"]
+
+def call_ai_safely(name: str, fn, prompt: str, status_widget):
+    try:
+        result = fn(prompt)
+        status_widget.update(label=f"✅ {name} answered")
+        return result, True
+    except Exception as err:
+        status_widget.update(label=f"⚠️ {name} unavailable — skipped")
+        return "", False
+
 # ==================== Main App ====================
 if st.session_state.user:
     MAX_FREE_QUERIES = 10
     user_email = st.session_state.user.email
 
     st.title("🎼 AI Conductor")
-    st.caption("One task → Multiple AIs → Best plan + execution")
+    st.caption("One task → Claude · Gemini · Cohere · Mistral → Best combined plan")
 
     with st.sidebar:
         st.header("How it works")
-        st.write("1. Multiple AIs answer your question")
-        st.write("2. Conductor creates one strong plan")
-        st.write("3. Agents compete (Code + Planning)")
-        st.write("4. You get the best combined result")
+        st.write("1. **4 AIs** answer your question simultaneously")
+        st.write("2. Conductor synthesizes the best combined plan")
+        st.write("3. Code Agent writes the implementation")
+        st.write("4. Planning Agent breaks it into steps")
+        st.divider()
+        st.markdown("**Active AI Models:**")
+        st.write("🤖 Claude (Anthropic)")
+        st.write("✨ Gemini (Google)")
+        st.write("🟣 Command R+ (Cohere)")
+        st.write("🟠 Mistral Large")
         st.divider()
         st.caption(f"Signed in as **{user_email}**")
         st.metric("Usage Today", f"{st.session_state.usage_count} / {MAX_FREE_QUERIES} queries")
@@ -141,63 +183,70 @@ if st.session_state.user:
                 claude = get_claude(temperature=0.3)
                 synthesizer = get_claude(temperature=0.2)
 
-                status = st.status("🤖 Asking Claude...", expanded=True)
-                with status:
+                s1 = st.status("🤖 Asking Claude...", expanded=False)
+                with s1:
                     raw_claude = claude.invoke(prompt).content
-                    status.update(label="✅ Claude answered")
+                    s1.update(label="✅ Claude answered")
 
-                status2 = st.status("✨ Asking Gemini...", expanded=True)
-                with status2:
-                    try:
-                        raw_gemini = ask_gemini(prompt)
-                        status2.update(label="✅ Gemini answered")
-                        gemini_available = True
-                    except Exception as gemini_err:
-                        raw_gemini = ""
-                        gemini_available = False
-                        if "429" in str(gemini_err) or "RESOURCE_EXHAUSTED" in str(gemini_err):
-                            status2.update(label="⚠️ Gemini quota exceeded — continuing with Claude only")
-                        else:
-                            status2.update(label="⚠️ Gemini unavailable — continuing with Claude only")
+                s2 = st.status("✨ Asking Gemini...", expanded=False)
+                with s2:
+                    raw_gemini, gemini_ok = call_ai_safely("Gemini", ask_gemini, prompt, s2)
 
-                status3 = st.status("🎼 Synthesizing plan...", expanded=True)
-                with status3:
-                    if gemini_available:
-                        synth_context = f"Task: {prompt}\n\nClaude: {raw_claude}\n\nGemini: {raw_gemini}"
-                        synth_instruction = "Create one clear, actionable plan by combining the best parts of both responses."
-                    else:
-                        synth_context = f"Task: {prompt}\n\nClaude: {raw_claude}"
-                        synth_instruction = "Create one clear, actionable plan based on this response."
+                s3 = st.status("🟣 Asking Cohere...", expanded=False)
+                with s3:
+                    raw_cohere, cohere_ok = call_ai_safely("Cohere", ask_cohere, prompt, s3)
+
+                s4 = st.status("🟠 Asking Mistral...", expanded=False)
+                with s4:
+                    raw_mistral, mistral_ok = call_ai_safely("Mistral", ask_mistral, prompt, s4)
+
+                s5 = st.status("🎼 Synthesizing plan from all AIs...", expanded=False)
+                with s5:
+                    responses = [f"Claude:\n{raw_claude}"]
+                    if gemini_ok:
+                        responses.append(f"Gemini:\n{raw_gemini}")
+                    if cohere_ok:
+                        responses.append(f"Cohere:\n{raw_cohere}")
+                    if mistral_ok:
+                        responses.append(f"Mistral:\n{raw_mistral}")
+
+                    ai_count = len(responses)
+                    synth_context = f"Task: {prompt}\n\n" + "\n\n".join(responses)
+                    synth_instruction = (
+                        f"You received {ai_count} AI responses to the same task. "
+                        "Synthesize the best ideas from all of them into one clear, actionable, well-structured plan. "
+                        "Do not simply pick one — combine the strongest insights from each."
+                    )
                     plan = synthesizer.invoke([
                         SystemMessage(content=synth_instruction),
                         HumanMessage(content=synth_context),
                     ]).content
-                    status3.update(label="✅ Plan ready")
+                    s5.update(label=f"✅ Plan synthesized from {ai_count} AI response(s)")
 
                 st.markdown("**📋 Synthesized Plan:**")
                 st.write(plan)
 
-                status4 = st.status("💻 Running Code Agent...", expanded=True)
-                with status4:
+                s6 = st.status("💻 Running Code Agent...", expanded=False)
+                with s6:
                     code_agent = synthesizer.invoke([
-                        HumanMessage(content=f"Write clean Python code for this plan:\n{plan}"),
+                        HumanMessage(content=f"Write clean, well-commented Python code to implement this plan:\n{plan}"),
                     ]).content
-                    status4.update(label="✅ Code Agent done")
+                    s6.update(label="✅ Code Agent done")
 
-                status5 = st.status("📋 Running Planning Agent...", expanded=True)
-                with status5:
+                s7 = st.status("📋 Running Planning Agent...", expanded=False)
+                with s7:
                     planning_agent = synthesizer.invoke([
-                        HumanMessage(content=f"Break this into detailed numbered steps:\n{plan}"),
+                        HumanMessage(content=f"Break this plan into detailed, numbered action steps a developer can follow:\n{plan}"),
                     ]).content
-                    status5.update(label="✅ Planning Agent done")
+                    s7.update(label="✅ Planning Agent done")
 
                 with st.expander("💻 Code Agent Output"):
                     st.markdown(code_agent)
-
                 with st.expander("📋 Planning Agent Output"):
                     st.markdown(planning_agent)
 
-                final = f"""**Final Result**
+                active_ais = ["Claude"] + (["Gemini"] if gemini_ok else []) + (["Cohere"] if cohere_ok else []) + (["Mistral"] if mistral_ok else [])
+                final = f"""**Final Result** *(synthesized from {", ".join(active_ais)})*
 
 **Plan Summary:**
 {plan}
@@ -215,8 +264,8 @@ if st.session_state.user:
                 with open(Path(__file__).parent / "conductor_result.md", "w", encoding="utf-8") as f:
                     f.write(f"# Question\n{prompt}\n\n{final}")
 
-                st.success("✅ Result saved as conductor_result.md")
-                st.caption("💰 Estimated cost per run: ≈ $0.08–$0.25 depending on length")
+                st.success(f"✅ Done! Used {len(active_ais)} AI(s): {', '.join(active_ais)}")
+                st.caption("💰 Estimated cost per run: ≈ $0.08–$0.30 depending on length")
                 st.session_state.messages.append({"role": "assistant", "content": final})
 
             except Exception as e:
