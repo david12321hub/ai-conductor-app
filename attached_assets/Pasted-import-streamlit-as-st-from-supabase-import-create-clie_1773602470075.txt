@@ -1,0 +1,89 @@
+import streamlit as st
+from supabase import create_client, Client
+import os
+from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
+
+load_dotenv()
+
+# ==================== Supabase Setup ====================
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_ANON_KEY")
+
+if not supabase_url or not supabase_key:
+    st.error("Supabase credentials not found in secrets. Add SUPABASE_URL and SUPABASE_ANON_KEY.")
+    st.stop()
+
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# ==================== Session State ====================
+if 'user' not in st.session_state:
+    st.session_state.user = None
+if 'usage_count' not in st.session_state:
+    st.session_state.usage_count = 0
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+
+# ==================== Auth UI ====================
+def show_auth():
+    tab1, tab2 = st.tabs(["Log In", "Sign Up"])
+
+    with tab1:
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_pw")
+        if st.button("Log In"):
+            try:
+                response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                if response.user:
+                    st.session_state.user = response.user
+                    st.success(f"Welcome back!")
+                    st.rerun()
+                else:
+                    st.error("Login failed.")
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+
+    with tab2:
+        new_email = st.text_input("Email", key="signup_email")
+        new_password = st.text_input("Password", type="password", key="signup_pw")
+        confirm_pw = st.text_input("Confirm Password", type="password", key="signup_confirm")
+        if st.button("Create Account"):
+            if new_password != confirm_pw:
+                st.error("Passwords don't match.")
+            elif len(new_password) < 8:
+                st.error("Password must be at least 8 characters.")
+            else:
+                try:
+                    response = supabase.auth.sign_up({"email": new_email, "password": new_password})
+                    if response.user:
+                        st.success("Account created! Check your email to confirm, then log in.")
+                    else:
+                        st.error("Sign up failed — email may be in use.")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+
+# ==================== Main App (only shown when logged in) ====================
+if st.session_state.user:
+    st.title("🎼 AI Conductor")
+    st.caption("One task → Multiple AIs → Best plan + execution")
+
+    # Usage counter (per user – stored in Supabase later)
+    st.sidebar.metric("Your Usage Today", f"{st.session_state.usage_count} queries")
+
+    MAX_FREE = 10
+    if st.session_state.usage_count >= MAX_FREE:
+        st.warning("Free limit reached. Upgrade coming soon!")
+        st.stop()
+
+    # Your existing conductor logic here...
+    # (paste the parallel query, synthesize, agents, output code from before)
+
+    if st.button("Log Out"):
+        supabase.auth.sign_out()
+        st.session_state.user = None
+        st.rerun()
+
+else:
+    show_auth()

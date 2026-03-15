@@ -4,11 +4,15 @@ from supabase import create_client, Client
 
 
 def get_supabase() -> Client:
-    url = os.environ.get("SUPABASE_URL") or _get_streamlit_secret("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_KEY") or _get_streamlit_secret("SUPABASE_KEY")
+    url = (os.environ.get("SUPABASE_URL")
+           or _get_streamlit_secret("SUPABASE_URL"))
+    key = (os.environ.get("SUPABASE_ANON_KEY")
+           or os.environ.get("SUPABASE_KEY")
+           or _get_streamlit_secret("SUPABASE_ANON_KEY")
+           or _get_streamlit_secret("SUPABASE_KEY"))
     if not url or not key:
         raise ValueError(
-            "Missing SUPABASE_URL or SUPABASE_KEY. "
+            "Missing SUPABASE_URL or SUPABASE_ANON_KEY. "
             "Add them as environment secrets (Replit) or Streamlit secrets."
         )
     return create_client(url, key)
