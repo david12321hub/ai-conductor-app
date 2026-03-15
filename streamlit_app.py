@@ -105,23 +105,28 @@ def _stripe_key() -> str:
 def create_stripe_session(price_id: str, mode: str, user_email: str, user_id: str, credits_grant: int) -> str:
     base_url = get_base_url()
     key = _stripe_key()
-    data = {
-        "payment_method_types[]": "card",
-        "line_items[0][price]": price_id,
-        "line_items[0][quantity]": "1",
-        "mode": mode,
-        "success_url": f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}&credits={credits_grant}&mode={mode}",
-        "cancel_url": f"{base_url}?payment=cancelled",
-        "customer_email": user_email,
-        "client_reference_id": user_id,
-    }
+    success_url = f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}&credits={credits_grant}&mode={mode}"
+    cancel_url  = f"{base_url}?payment=cancelled"
+    # Stripe REST API uses form-encoded tuples for repeated/nested fields
+    fields = [
+        ("line_items[0][price]",    price_id),
+        ("line_items[0][quantity]", "1"),
+        ("mode",                    mode),
+        ("success_url",             success_url),
+        ("cancel_url",              cancel_url),
+        ("client_reference_id",     user_id),
+    ]
+    if user_email:
+        fields.append(("customer_email", user_email))
     r = requests.post(
         "https://api.stripe.com/v1/checkout/sessions",
         auth=(key, ""),
-        data=data,
+        data=fields,
         timeout=15,
     )
-    r.raise_for_status()
+    if not r.ok:
+        err = r.json().get("error", {}).get("message", r.text)
+        raise ValueError(f"Stripe error: {err}")
     return r.json()["url"]
 
 def verify_stripe_session(session_id: str, mode: str) -> bool:
