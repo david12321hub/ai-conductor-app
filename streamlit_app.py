@@ -1,22 +1,45 @@
 import streamlit as st
-from supabase import create_client, Client
+import requests
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
-from pathlib import Path
 import os
 
 st.set_page_config(page_title="AI Conductor", page_icon="🎼", layout="centered")
 
-# ==================== Supabase Setup ====================
-supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-supabase_key = st.secrets.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+# ==================== Supabase Setup (direct REST — no package needed) ====================
+SUPABASE_URL = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = st.secrets.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_ANON_KEY", "")
 
-if not supabase_url or not supabase_key:
-    st.error("Supabase credentials not found. Add SUPABASE_URL and SUPABASE_ANON_KEY to Streamlit secrets.")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Add SUPABASE_URL and SUPABASE_ANON_KEY to your Streamlit secrets.")
     st.stop()
 
-supabase: Client = create_client(supabase_url, supabase_key)
+AUTH_HEADERS = {"apikey": SUPABASE_KEY, "Content-Type": "application/json"}
+
+def supabase_login(email: str, password: str):
+    r = requests.post(
+        f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+        headers=AUTH_HEADERS,
+        json={"email": email, "password": password},
+        timeout=10,
+    )
+    if r.status_code == 200:
+        data = r.json()
+        return data.get("user"), None
+    return None, r.json().get("error_description", r.json().get("msg", "Login failed."))
+
+def supabase_signup(email: str, password: str):
+    r = requests.post(
+        f"{SUPABASE_URL}/auth/v1/signup",
+        headers=AUTH_HEADERS,
+        json={"email": email, "password": password},
+        timeout=10,
+    )
+    if r.status_code == 200:
+        data = r.json()
+        return data.get("user"), None
+    return None, r.json().get("error_description", r.json().get("msg", "Sign up failed."))
 
 # ==================== Session State ====================
 if "user" not in st.session_state:
@@ -38,15 +61,15 @@ def show_auth():
         email = st.text_input("Email", key="login_email")
         password = st.text_input("Password", type="password", key="login_pw")
         if st.button("Log In", use_container_width=True):
-            try:
-                response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                if response.user:
-                    st.session_state.user = response.user
+            if email and password:
+                user, err = supabase_login(email, password)
+                if user:
+                    st.session_state.user = user
                     st.rerun()
                 else:
-                    st.error("Login failed.")
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+                    st.error(f"Login failed: {err}")
+            else:
+                st.warning("Please enter your email and password.")
 
     with tab_signup:
         new_email = st.text_input("Email", key="signup_email")
@@ -57,15 +80,14 @@ def show_auth():
                 st.error("Passwords don't match.")
             elif len(new_password) < 8:
                 st.error("Password must be at least 8 characters.")
+            elif not new_email:
+                st.warning("Please enter your email.")
             else:
-                try:
-                    response = supabase.auth.sign_up({"email": new_email, "password": new_password})
-                    if response.user:
-                        st.success("Account created! Check your email to confirm, then log in.")
-                    else:
-                        st.error("Sign up failed — email may already be in use.")
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                user, err = supabase_signup(new_email, new_password)
+                if user:
+                    st.success("Account created! Check your email to confirm, then log in.")
+                else:
+                    st.error(f"Sign up failed: {err}")
 
 # ==================== AI Clients ====================
 def get_anthropic_key():
@@ -104,7 +126,7 @@ def ask_gemini(prompt: str) -> str:
 # ==================== Main App ====================
 if st.session_state.user:
     MAX_FREE_QUERIES = 10
-    user_email = st.session_state.user.email
+    user_email = st.session_state.user.get("email", "")
 
     st.title("🎼 AI Conductor")
     st.caption("One task → Multiple AIs → Best plan + execution")
@@ -122,7 +144,6 @@ if st.session_state.user:
             st.session_state.messages = []
             st.rerun()
         if st.button("🚪 Log Out"):
-            supabase.auth.sign_out()
             st.session_state.user = None
             st.session_state.messages = []
             st.session_state.usage_count = 0
@@ -143,7 +164,6 @@ if st.session_state.user:
 
         with st.chat_message("assistant"):
             st.session_state.usage_count += 1
-
             try:
                 claude = get_claude(temperature=0.3)
                 synthesizer = get_claude(temperature=0.2)
@@ -200,32 +220,17 @@ if st.session_state.user:
 
                 with st.expander("💻 Code Agent Output"):
                     st.markdown(code_agent)
-
                 with st.expander("📋 Planning Agent Output"):
                     st.markdown(planning_agent)
 
-                final = f"""**Final Result**
+                final = f"""**Final Result**\n\n**Plan Summary:**\n{plan}\n\n**Code Agent Output:**\n```python\n{code_agent}\n```\n\n**Planning Agent Output:**\n{planning_agent}\n\n**Recommended Next Step:** Save the code above and run it!\n"""
 
-**Plan Summary:**
-{plan}
-
-**Code Agent Output:**
-```python
-{code_agent}
-```
-
-**Planning Agent Output:**
-{planning_agent}
-
-**Recommended Next Step:** Save the code above and run it!
-"""
                 st.download_button(
                     label="⬇️ Download result as Markdown",
                     data=f"# Question\n{prompt}\n\n{final}",
                     file_name="conductor_result.md",
                     mime="text/markdown",
                 )
-
                 st.session_state.messages.append({"role": "assistant", "content": final})
 
             except Exception as e:
