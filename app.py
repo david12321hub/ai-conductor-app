@@ -23,10 +23,29 @@ supabase: Client = create_client(supabase_url, supabase_key)
 # ==================== Session State ====================
 if "user" not in st.session_state:
     st.session_state.user = None
-if "usage_count" not in st.session_state:
-    st.session_state.usage_count = 0
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "page" not in st.session_state:
+    st.session_state.page = "chat"
+
+# ==================== Credits Helpers ====================
+def get_credits(user_id: str) -> int:
+    try:
+        res = supabase.table("credits").select("balance").eq("user_id", user_id).execute()
+        if res.data:
+            return res.data[0]["balance"]
+        supabase.table("credits").insert({"user_id": user_id, "balance": 10}).execute()
+        return 10
+    except Exception:
+        return 0
+
+def deduct_credit(user_id: str, balance: int) -> int:
+    new_balance = max(0, balance - 1)
+    try:
+        supabase.table("credits").update({"balance": new_balance}).eq("user_id", user_id).execute()
+    except Exception:
+        pass
+    return new_balance
 
 # ==================== Auth UI ====================
 def show_auth():
@@ -68,6 +87,41 @@ def show_auth():
                         st.error("Sign up failed — email may already be in use.")
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
+
+# ==================== Upgrade Page ====================
+def show_upgrade(user_email: str, balance: int):
+    st.title("💳 Upgrade Your Plan")
+    st.caption(f"Current balance: **{balance} credit(s)**")
+    st.divider()
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("### 🥉 Starter")
+        st.markdown("**$5**")
+        st.markdown("- 50 credits\n- All 4 AI models\n- Download results")
+        if st.button("Buy Starter", use_container_width=True, key="buy_starter"):
+            st.info("Payment coming soon — contact support to upgrade.")
+
+    with col2:
+        st.markdown("### 🥈 Pro")
+        st.markdown("**$15**")
+        st.markdown("- 200 credits\n- All 4 AI models\n- Download results\n- Priority support")
+        if st.button("Buy Pro", use_container_width=True, key="buy_pro"):
+            st.info("Payment coming soon — contact support to upgrade.")
+
+    with col3:
+        st.markdown("### 🥇 Unlimited")
+        st.markdown("**$49/mo**")
+        st.markdown("- Unlimited credits\n- All 4 AI models\n- Download results\n- Priority support\n- Early features")
+        if st.button("Buy Unlimited", use_container_width=True, key="buy_unlimited"):
+            st.info("Payment coming soon — contact support to upgrade.")
+
+    st.divider()
+    st.caption("Each query costs 1 credit and runs Claude + Gemini + Cohere + Mistral simultaneously.")
+    if st.button("← Back to Chat"):
+        st.session_state.page = "chat"
+        st.rerun()
 
 # ==================== AI Clients ====================
 @st.cache_resource
@@ -126,33 +180,34 @@ def call_ai_safely(name: str, fn, prompt: str, status_widget):
         result = fn(prompt)
         status_widget.update(label=f"✅ {name} answered")
         return result, True
-    except Exception as err:
+    except Exception:
         status_widget.update(label=f"⚠️ {name} unavailable — skipped")
         return "", False
 
 # ==================== Main App ====================
 if st.session_state.user:
-    MAX_FREE_QUERIES = 10
+    user_id = st.session_state.user.id
     user_email = st.session_state.user.email
-
-    st.title("🎼 AI Conductor")
-    st.caption("One task → Claude · Gemini · Cohere · Mistral → Best combined plan")
+    balance = get_credits(user_id)
 
     with st.sidebar:
-        st.header("How it works")
-        st.write("1. **4 AIs** answer your question simultaneously")
-        st.write("2. Conductor synthesizes the best combined plan")
-        st.write("3. Code Agent writes the implementation")
-        st.write("4. Planning Agent breaks it into steps")
+        st.markdown(f"**🎼 AI Conductor**")
+        st.caption(f"Signed in as **{user_email}**")
+        st.divider()
+
+        credit_color = "🟢" if balance > 5 else ("🟡" if balance > 0 else "🔴")
+        st.metric("Credits", f"{credit_color} {balance}")
+
+        if st.button("💳 Buy More Credits", use_container_width=True):
+            st.session_state.page = "upgrade"
+            st.rerun()
+
         st.divider()
         st.markdown("**Active AI Models:**")
-        st.write("🤖 Claude (Anthropic)")
-        st.write("✨ Gemini (Google)")
-        st.write("🟣 Command R+ (Cohere)")
-        st.write("🟠 Mistral Large")
+        st.write("🤖 Claude · ✨ Gemini")
+        st.write("🟣 Cohere · 🟠 Mistral")
         st.divider()
-        st.caption(f"Signed in as **{user_email}**")
-        st.metric("Usage Today", f"{st.session_state.usage_count} / {MAX_FREE_QUERIES} queries")
+
         if st.button("🗑️ Clear conversation"):
             st.session_state.messages = []
             st.rerun()
@@ -160,11 +215,22 @@ if st.session_state.user:
             supabase.auth.sign_out()
             st.session_state.user = None
             st.session_state.messages = []
-            st.session_state.usage_count = 0
+            st.session_state.page = "chat"
             st.rerun()
 
-    if st.session_state.usage_count >= MAX_FREE_QUERIES:
-        st.warning(f"You've reached the free limit ({MAX_FREE_QUERIES} queries). Upgrade coming soon!")
+    if st.session_state.page == "upgrade":
+        show_upgrade(user_email, balance)
+        st.stop()
+
+    st.title("🎼 AI Conductor")
+    st.caption("One task → Claude · Gemini · Cohere · Mistral → Best combined plan")
+
+    if balance <= 0:
+        st.error("🔴 You're out of credits.")
+        st.markdown("Upgrade your plan to keep using AI Conductor.")
+        if st.button("💳 View Plans & Buy Credits", use_container_width=True):
+            st.session_state.page = "upgrade"
+            st.rerun()
         st.stop()
 
     for msg in st.session_state.messages:
@@ -177,8 +243,6 @@ if st.session_state.user:
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            st.session_state.usage_count += 1
-
             try:
                 claude = get_claude(temperature=0.3)
                 synthesizer = get_claude(temperature=0.2)
@@ -223,6 +287,8 @@ if st.session_state.user:
                     ]).content
                     s5.update(label=f"✅ Plan synthesized from {ai_count} AI response(s)")
 
+                balance = deduct_credit(user_id, balance)
+
                 st.markdown("**📋 Synthesized Plan:**")
                 st.write(plan)
 
@@ -245,7 +311,9 @@ if st.session_state.user:
                 with st.expander("📋 Planning Agent Output"):
                     st.markdown(planning_agent)
 
-                active_ais = ["Claude"] + (["Gemini"] if gemini_ok else []) + (["Cohere"] if cohere_ok else []) + (["Mistral"] if mistral_ok else [])
+                active_ais = (["Claude"] + (["Gemini"] if gemini_ok else []) +
+                              (["Cohere"] if cohere_ok else []) + (["Mistral"] if mistral_ok else []))
+
                 final = f"""**Final Result** *(synthesized from {", ".join(active_ais)})*
 
 **Plan Summary:**
@@ -264,13 +332,11 @@ if st.session_state.user:
                 with open(Path(__file__).parent / "conductor_result.md", "w", encoding="utf-8") as f:
                     f.write(f"# Question\n{prompt}\n\n{final}")
 
-                st.success(f"✅ Done! Used {len(active_ais)} AI(s): {', '.join(active_ais)}")
-                st.caption("💰 Estimated cost per run: ≈ $0.08–$0.30 depending on length")
+                st.success(f"✅ Done! Used {len(active_ais)} AI(s): {', '.join(active_ais)} · Credits remaining: {balance}")
                 st.session_state.messages.append({"role": "assistant", "content": final})
 
             except Exception as e:
                 st.error(f"❌ Something went wrong: {e}")
-                st.session_state.usage_count = max(0, st.session_state.usage_count - 1)
 
 else:
     show_auth()
