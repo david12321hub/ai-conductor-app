@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-import stripe
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
@@ -23,8 +22,6 @@ DB_HEADERS = {
     "Content-Type": "application/json",
     "Prefer": "return=representation",
 }
-
-stripe.api_key = st.secrets.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_SECRET_KEY", "")
 
 # ==================== Stripe Price IDs ====================
 STRIPE_PRO_PRICE_ID  = "price_1TBMFdF454Yi4ROE9JrsRpZu"   # $9/month subscription
@@ -96,23 +93,44 @@ def get_base_url() -> str:
         pass
     return os.environ.get("APP_URL", "http://localhost:8501")
 
+def _stripe_key() -> str:
+    return st.secrets.get("STRIPE_SECRET_KEY") or os.environ.get("STRIPE_SECRET_KEY", "")
+
 def create_stripe_session(price_id: str, mode: str, user_email: str, user_id: str, credits_grant: int) -> str:
     base_url = get_base_url()
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=[{"price": price_id, "quantity": 1}],
-        mode=mode,
-        success_url=f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}&credits={credits_grant}&mode={mode}",
-        cancel_url=f"{base_url}?payment=cancelled",
-        customer_email=user_email,
-        client_reference_id=user_id,
+    key = _stripe_key()
+    data = {
+        "payment_method_types[]": "card",
+        "line_items[0][price]": price_id,
+        "line_items[0][quantity]": "1",
+        "mode": mode,
+        "success_url": f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}&credits={credits_grant}&mode={mode}",
+        "cancel_url": f"{base_url}?payment=cancelled",
+        "customer_email": user_email,
+        "client_reference_id": user_id,
+    }
+    r = requests.post(
+        "https://api.stripe.com/v1/checkout/sessions",
+        auth=(key, ""),
+        data=data,
+        timeout=15,
     )
-    return session.url
+    r.raise_for_status()
+    return r.json()["url"]
 
 def verify_stripe_session(session_id: str, mode: str) -> bool:
     try:
-        session = stripe.checkout.Session.retrieve(session_id)
-        return session.status == "complete" if mode == "subscription" else session.payment_status == "paid"
+        key = _stripe_key()
+        r = requests.get(
+            f"https://api.stripe.com/v1/checkout/sessions/{session_id}",
+            auth=(key, ""),
+            timeout=10,
+        )
+        r.raise_for_status()
+        data = r.json()
+        if mode == "subscription":
+            return data.get("status") == "complete"
+        return data.get("payment_status") == "paid"
     except Exception:
         return False
 

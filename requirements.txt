@@ -1,6 +1,5 @@
 streamlit
 requests
-stripe
 anthropic
 google-genai
 langchain-anthropic
