@@ -5,7 +5,40 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
 import os
 
-st.set_page_config(page_title="AI Conductor", page_icon="🎼", layout="centered")
+st.set_page_config(page_title="AI Conductor", page_icon="conductor_logo.png", layout="centered")
+
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #0e1117;
+        color: #ffffff;
+    }
+    h1, h2, h3 {
+        color: #00d4ff;
+        font-family: 'Helvetica Neue', sans-serif;
+    }
+    .stButton > button {
+        background-color: #00d4ff;
+        color: black;
+        border-radius: 8px;
+        padding: 10px 24px;
+        font-weight: bold;
+    }
+    .stButton > button:hover {
+        background-color: #00b8d9;
+        color: black;
+    }
+    section[data-testid="stSidebar"] {
+        background-color: #161b22;
+        border-right: 1px solid #30363d;
+    }
+    .stExpander {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # ==================== Supabase Setup (direct REST — no package needed) ====================
 SUPABASE_URL = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL", "")
@@ -159,7 +192,8 @@ if "checkout_url" not in st.session_state:
 
 # ==================== Auth UI ====================
 def show_auth():
-    st.title("🎼 AI Conductor")
+    st.image("conductor_logo.png", width=180)
+    st.title("AI Conductor")
     st.caption("One task → Multiple AIs → Best plan + execution")
     st.divider()
 
@@ -344,7 +378,7 @@ if st.session_state.user:
 
     # ---- Sidebar ----
     with st.sidebar:
-        st.markdown("**🎼 AI Conductor**")
+        st.image("conductor_logo.png", width=100)
         st.caption(f"Signed in as **{user_email}**")
         st.divider()
         st.header("Choose Your Plan")
@@ -412,7 +446,8 @@ if st.session_state.user:
         show_upgrade(user_email, user_id, balance)
         st.stop()
 
-    st.title("🎼 AI Conductor")
+    st.image("conductor_logo.png", width=180)
+    st.title("AI Conductor")
     st.caption("One task → Claude · Gemini · Cohere · Mistral → Best combined plan")
 
     if balance <= 0:
