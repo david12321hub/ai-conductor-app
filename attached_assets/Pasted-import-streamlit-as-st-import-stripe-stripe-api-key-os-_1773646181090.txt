@@ -1,0 +1,70 @@
+import streamlit as st
+import stripe
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+# ==================== Upgrade / Trial Section ====================
+st.sidebar.header("Choose Your Plan")
+st.sidebar.caption("Start free or upgrade for unlimited access")
+
+# Free Trial Box
+with st.sidebar.expander("Free Trial – One-Time", expanded=True):
+    st.write("Try AI Conductor once for free")
+    st.write("• Full access to all models & agents")
+    st.write("• One complete query (plan + code)")
+    st.write("No card needed – just click below")
+    if st.button("Start Free Trial", key="free_trial", use_container_width=True):
+        # Logic to allow one free query (you can track in session or Supabase)
+        if 'free_trial_used' not in st.session_state:
+            st.session_state.free_trial_used = True
+            st.success("Free trial activated! Ask your question below.")
+        else:
+            st.warning("You've already used your free trial. Upgrade to continue!")
+
+# Paid Tiers (in columns for nice layout)
+col1, col2, col3 = st.sidebar.columns(3)
+
+with col1:
+    st.subheader("Basic")
+    st.write("$9/month")
+    st.caption("100–500 queries")
+    if st.button("Choose Basic", key="basic"):
+        try:
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{'price': 'price_1TBMRNFC68YihsMHbAOq7jGj', 'quantity': 1}],
+                mode='subscription',
+                success_url='https://aiconductorapp.com/success',
+                cancel_url='https://aiconductorapp.com/cancel',
+            )
+            st.markdown(f"[Pay Now →]({session.url})")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+with col2:
+    st.subheader("Pro")
+    st.write("$29/month")
+    st.caption("1,000+ queries")
+    if st.button("Choose Pro", key="pro"):
+        try:
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{'price': 'price_1TBMROFC68YihsMHDom1cias', 'quantity': 1}],
+                mode='subscription',
+                success_url='https://aiconductorapp.com/success',
+                cancel_url='https://aiconductorapp.com/cancel',
+            )
+            st.markdown(f"[Pay Now →]({session.url})")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+with col3:
+    st.subheader("Enterprise")
+    st.write("Custom")
+    st.caption("Unlimited + dedicated")
+    if st.button("Contact Us", key="enterprise"):
+        st.info("Email support@aiconductorapp.com for custom pricing")
+
+# Success message (add at bottom or separate page)
+if 'success' in st.experimental_get_query_params():
+    st.success("Payment successful! Your plan is active.")

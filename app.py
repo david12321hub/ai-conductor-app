@@ -33,6 +33,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "page" not in st.session_state:
     st.session_state.page = "chat"
+if "free_trial_used" not in st.session_state:
+    st.session_state.free_trial_used = False
 if "checkout_url" not in st.session_state:
     st.session_state.checkout_url = None
 
@@ -285,11 +287,26 @@ if st.session_state.user:
         st.markdown("**🎼 AI Conductor**")
         st.caption(f"Signed in as **{user_email}**")
         st.divider()
-        st.header("Upgrade Your Plan")
-        st.caption("Free tier: 10 queries. Unlock more queries and features.")
+        st.header("Choose Your Plan")
+        st.caption("Start free or upgrade for unlimited access.")
 
-        if st.button("⚡ Basic — $9/month", use_container_width=True):
-            with st.spinner("Setting up..."):
+        with st.expander("🎁 Free Trial — One-Time", expanded=True):
+            st.write("Try AI Conductor once, completely free.")
+            st.write("• Full access to all models & agents")
+            st.write("• One complete query (plan + code)")
+            st.write("No card needed — just click below.")
+            if st.button("Start Free Trial", key="free_trial", use_container_width=True):
+                if not st.session_state.get("free_trial_used"):
+                    st.session_state.free_trial_used = True
+                    st.success("Free trial activated! Ask your question below.")
+                else:
+                    st.warning("You've already used your free trial. Upgrade to continue!")
+
+        sc1, sc2, sc3 = st.columns(3)
+        with sc1:
+            st.markdown("**⚡ Basic**")
+            st.caption("$9/mo · 500 queries")
+            if st.button("Choose", key="sb_basic", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
                     st.session_state.checkout_url = url
@@ -297,9 +314,10 @@ if st.session_state.user:
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))
-
-        if st.button("🚀 Pro — $29/month", use_container_width=True):
-            with st.spinner("Setting up..."):
+        with sc2:
+            st.markdown("**🚀 Pro**")
+            st.caption("$29/mo · 1,000+")
+            if st.button("Choose", key="sb_pro", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
                     st.session_state.checkout_url = url
@@ -307,9 +325,11 @@ if st.session_state.user:
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))
-
-        if st.button("🏢 Enterprise — Contact Us", use_container_width=True):
-            st.info("📧 support@aiconductorapp.com")
+        with sc3:
+            st.markdown("**🏢 Ent.**")
+            st.caption("Custom")
+            if st.button("Contact", key="sb_ent", use_container_width=True):
+                st.info("📧 support@aiconductorapp.com")
 
         st.divider()
         credit_color = "🟢" if balance > 5 else ("🟡" if balance > 0 else "🔴")
