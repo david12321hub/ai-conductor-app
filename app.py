@@ -130,8 +130,11 @@ AUTH_HEADERS = {
 
 # ==================== Stripe Price IDs ====================
 STRIPE_BASIC_PRICE_ID        = "price_1TBMRNFC68YihsMHbAOq7jGj"  # $9/mo  — Basic
-STRIPE_PRO_PRICE_ID          = "price_REPLACE_WITH_49_MONTHLY"    # $49/mo — Pro Unlimited
-STRIPE_ENTERPRISE_PRICE_ID   = "price_REPLACE_WITH_149_MONTHLY"   # $149/mo — Enterprise Unlimited
+STRIPE_PRO_PRICE_ID          = "price_1TBMROFC68YihsMHDom1cias"   # $49/mo — Pro Unlimited
+STRIPE_ENTERPRISE_PRICE_ID   = "price_1TBMRKFC68YihsMHgZofMvjO"   # $149/mo — Enterprise Unlimited
+
+# Pay-as-you-go credit packs (one-time, priced via price_data)
+PAYG_PACKS = {5: 100, 10: 250, 15: 400, 20: 600}  # dollars → credits
 
 # ==================== Session State ====================
 if "user" not in st.session_state:
@@ -258,6 +261,35 @@ def create_stripe_session(price_id: str, mode: str, user_email: str, user_id: st
         raise ValueError(f"Stripe error: {err}")
     return r.json()["url"]
 
+def create_stripe_payg_session(amount_dollars: int, user_email: str, user_id: str) -> str:
+    credits_grant = PAYG_PACKS.get(amount_dollars, amount_dollars * 20)
+    base_url = get_base_url()
+    key = _stripe_key()
+    success_url = (
+        f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}"
+        f"&credits={credits_grant}&mode=payment"
+    )
+    fields = [
+        ("line_items[0][price_data][currency]", "usd"),
+        ("line_items[0][price_data][unit_amount]", str(amount_dollars * 100)),
+        ("line_items[0][price_data][product_data][name]", f"AI Conductor Credits (${amount_dollars})"),
+        ("line_items[0][quantity]", "1"),
+        ("mode", "payment"),
+        ("success_url", success_url),
+        ("cancel_url", f"{base_url}?payment=cancelled"),
+        ("client_reference_id", user_id),
+    ]
+    if user_email:
+        fields.append(("customer_email", user_email))
+    r = requests.post(
+        "https://api.stripe.com/v1/checkout/sessions",
+        auth=(key, ""), data=fields, timeout=15,
+    )
+    if not r.ok:
+        err = r.json().get("error", {}).get("message", r.text)
+        raise ValueError(f"Stripe error: {err}")
+    return r.json()["url"]
+
 def verify_stripe_session(session_id: str, mode: str) -> bool:
     try:
         r = requests.get(
@@ -322,7 +354,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
         st.caption("You'll be taken to Stripe's hosted checkout. Return here after payment.")
         st.stop()
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.markdown("### Basic")
@@ -363,6 +395,20 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
                 except Exception as e:
                     st.error(f"Payment setup error: {str(e)}")
 
+    with col4:
+        st.markdown("### Pay-as-you-go")
+        st.markdown("One-time credit pack")
+        st.markdown("- $5 → 100 credits\n- $10 → 250 credits\n- $15 → 400 credits\n- $20 → 600 credits")
+        payg_amt = st.selectbox("Amount ($)", [5, 10, 15, 20], key="payg_amt_upg")
+        if st.button(f"Buy ${payg_amt} Credits", use_container_width=True, key="buy_payg"):
+            with st.spinner("Creating checkout..."):
+                try:
+                    url = create_stripe_payg_session(payg_amt, user_email, user_id)
+                    st.session_state.checkout_url = url
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Payment setup error: {str(e)}")
+
     st.divider()
     st.caption("Payments processed securely by Stripe. Test card: `4242 4242 4242 4242` · any future date · any CVC.")
     if st.button("← Back to Chat"):
@@ -372,7 +418,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 # ==================== Plans (main area) ====================
 def show_plans(user_email: str, user_id: str):
     st.subheader("Choose Your Plan")
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
 
     with c1:
         st.markdown("Free Trial")
@@ -414,6 +460,19 @@ def show_plans(user_email: str, user_id: str):
         if st.button("Choose Enterprise", key="plan_ent", use_container_width=True):
             try:
                 url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
+                st.session_state.checkout_url = url
+                st.session_state.page = "upgrade"
+                st.rerun()
+            except Exception as e:
+                st.error(str(e))
+
+    with c5:
+        st.markdown("Pay-as-you-go")
+        st.caption("One-time credit pack")
+        payg_amt = st.selectbox("Amount ($)", [5, 10, 15, 20], key="payg_amt_plans")
+        if st.button(f"Buy ${payg_amt}", key="plan_payg", use_container_width=True):
+            try:
+                url = create_stripe_payg_session(payg_amt, user_email, user_id)
                 st.session_state.checkout_url = url
                 st.session_state.page = "upgrade"
                 st.rerun()
@@ -557,6 +616,16 @@ if st.session_state.user:
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))
+        st.markdown("Pay-as-you-go")
+        sb_payg = st.selectbox("Top-up ($)", [5, 10, 15, 20], key="sb_payg_amt")
+        if st.button(f"Buy ${sb_payg} Credits", key="sb_payg_buy", use_container_width=True):
+            try:
+                url = create_stripe_payg_session(sb_payg, user_email, user_id)
+                st.session_state.checkout_url = url
+                st.session_state.page = "upgrade"
+                st.rerun()
+            except Exception as e:
+                st.error(str(e))
 
         st.divider()
         credit_color = "" if balance > 5 else ("" if balance > 0 else "")
