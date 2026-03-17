@@ -39,6 +39,13 @@ st.markdown("""
         border: 1px solid #30363d;
         border-radius: 8px;
     }
+    .stExpander summary, .stExpander summary p,
+    .stExpander [data-testid="stExpanderToggleIcon"],
+    details summary span {
+        color: #000000 !important;
+        background-color: #d0d0d0;
+        border-radius: 6px;
+    }
     /* Make all grey/muted text white */
     .stCaption, [data-testid="stCaptionContainer"] p,
     [data-testid="stCaptionContainer"], small,
