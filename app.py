@@ -153,12 +153,20 @@ def get_credits(user_id: str) -> int:
 
 def set_credits(user_id: str, new_balance: int):
     try:
-        requests.patch(
+        r = requests.patch(
             f"{SUPABASE_URL}/rest/v1/credits?user_id=eq.{user_id}",
-            headers=AUTH_HEADERS,
+            headers={**AUTH_HEADERS, "Prefer": "return=representation"},
             json={"balance": new_balance},
             timeout=10,
         )
+        updated = r.json()
+        if not updated:
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/credits",
+                headers=AUTH_HEADERS,
+                json={"user_id": user_id, "balance": new_balance},
+                timeout=10,
+            )
     except Exception:
         pass
 
