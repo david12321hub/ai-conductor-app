@@ -643,11 +643,53 @@ if st.session_state.user:
                 with open(Path(__file__).parent / "conductor_result.md", "w", encoding="utf-8") as f:
                     f.write(f"# Question\n{prompt}\n\n{final}")
 
+                st.session_state.last_code = code_agent
+                st.session_state.last_plan = f"# Question\n{prompt}\n\n{final}"
                 st.success(f"✅ Done! {', '.join(active_ais)} · Credits remaining: {balance}")
                 st.session_state.messages.append({"role": "assistant", "content": final})
 
             except Exception as e:
                 st.error(f"❌ Something went wrong: {e}")
+
+    if st.session_state.get("last_code") or st.session_state.get("last_plan"):
+        st.divider()
+        st.markdown("### Plan Actions")
+        col_exec, col_save = st.columns(2)
+
+        with col_exec:
+            if st.button("Run Code", use_container_width=True):
+                import subprocess, tempfile, sys
+                code = st.session_state.get("last_code", "")
+                # Strip markdown code fences if present
+                import re
+                code = re.sub(r"^```[a-z]*\n?", "", code, flags=re.MULTILINE)
+                code = re.sub(r"```$", "", code, flags=re.MULTILINE).strip()
+                with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as tmp:
+                    tmp.write(code)
+                    tmp_path = tmp.name
+                with st.spinner("Running code..."):
+                    result = subprocess.run(
+                        [sys.executable, tmp_path],
+                        capture_output=True, text=True, timeout=30
+                    )
+                if result.stdout:
+                    with st.expander("Output", expanded=True):
+                        st.code(result.stdout)
+                if result.stderr:
+                    with st.expander("Errors", expanded=True):
+                        st.code(result.stderr)
+                if not result.stdout and not result.stderr:
+                    st.success("Code ran successfully with no output.")
+
+        with col_save:
+            plan_text = st.session_state.get("last_plan", "")
+            st.download_button(
+                label="Save Plan",
+                data=plan_text,
+                file_name="conductor_plan.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
 
 else:
     show_auth()
