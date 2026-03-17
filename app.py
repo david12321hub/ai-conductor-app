@@ -39,6 +39,12 @@ st.markdown("""
         border: 1px solid #30363d;
         border-radius: 8px;
     }
+    /* Make all grey/muted text white */
+    .stCaption, [data-testid="stCaptionContainer"] p,
+    [data-testid="stCaptionContainer"], small,
+    .stMarkdown p, p, label, span {
+        color: #ffffff !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
