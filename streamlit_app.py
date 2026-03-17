@@ -9,63 +9,94 @@ st.set_page_config(page_title="AI Conductor", page_icon="conductor_logo.png", la
 
 st.markdown("""
     <style>
-    .stApp {
-        background-color: #0e1117;
-        color: #ffffff;
+    /* ── Base ── */
+    .stApp, .stApp > div { background-color: #0e1117 !important; color: #ffffff !important; }
+    header[data-testid="stHeader"] { background-color: #0e1117 !important; }
+    footer { display: none !important; }
+
+    /* ── Text ── */
+    h1, h2, h3, h4, h5, h6 { color: #00d4ff !important; font-family: 'Helvetica Neue', sans-serif; }
+    p, div, span, label, small, li, td, th { color: #ffffff !important; }
+    .stCaption, [data-testid="stCaptionContainer"] p,
+    [data-testid="stCaptionContainer"] { color: #bbbbbb !important; }
+    [data-testid="stMetricValue"], [data-testid="stMetricLabel"] { color: #ffffff !important; }
+    [data-testid="stMarkdownContainer"] p { color: #ffffff !important; }
+
+    /* ── Inputs — dark background, no white boxes ── */
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea,
+    .stNumberInput > div > div > input {
+        background-color: #1e2130 !important;
+        color: #ffffff !important;
+        border: 1px solid #444444 !important;
+        border-radius: 6px !important;
     }
-    h1, h2, h3 {
-        color: #00d4ff;
-        font-family: 'Helvetica Neue', sans-serif;
+    [data-testid="stChatInput"] > div,
+    [data-testid="stChatInputContainer"],
+    .stChatInput textarea {
+        background-color: #1e2130 !important;
+        color: #ffffff !important;
+        border: 1px solid #444444 !important;
     }
+
+    /* ── Tabs ── */
+    .stTabs [data-baseweb="tab-list"] { background-color: #0e1117 !important; }
+    .stTabs [data-baseweb="tab"] { color: #aaaaaa !important; background-color: #0e1117 !important; }
+    .stTabs [aria-selected="true"] { color: #00d4ff !important; border-bottom: 2px solid #00d4ff !important; }
+
+    /* ── Buttons ── */
     .stButton > button {
-        background-color: #2e2e2e;
-        color: #ffffff;
-        border-radius: 8px;
-        padding: 10px 24px;
-        font-weight: bold;
-        border: 1px solid #444444;
+        background-color: #2e2e2e !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        padding: 10px 24px !important;
+        font-weight: bold !important;
+        border: 1px solid #444444 !important;
     }
-    .stButton > button:hover {
-        background-color: #3d3d3d;
-        color: #ffffff;
-        border: 1px solid #555555;
+    .stButton > button:hover { background-color: #3d3d3d !important; border: 1px solid #555555 !important; }
+    .stDownloadButton > button {
+        background-color: #2e2e2e !important;
+        color: #ffffff !important;
+        border: 1px solid #444444 !important;
+        border-radius: 8px !important;
     }
     .stLinkButton a, [data-testid="stLinkButton"] a {
         background-color: #2e2e2e !important;
         color: #ffffff !important;
-        border-radius: 8px;
-        padding: 10px 24px;
-        font-weight: bold;
-        border: 1px solid #444444;
-        text-decoration: none;
-        display: inline-block;
+        border-radius: 8px !important;
+        padding: 10px 24px !important;
+        font-weight: bold !important;
+        border: 1px solid #444444 !important;
+        text-decoration: none !important;
+        display: inline-block !important;
     }
     .stLinkButton a:hover, [data-testid="stLinkButton"] a:hover {
-        background-color: #3d3d3d !important;
-        color: #ffffff !important;
+        background-color: #3d3d3d !important; color: #ffffff !important;
     }
-    section[data-testid="stSidebar"] {
-        background-color: #161b22;
-        border-right: 1px solid #30363d;
+
+    /* ── Sidebar ── */
+    section[data-testid="stSidebar"] { background-color: #161b22 !important; border-right: 1px solid #30363d; }
+
+    /* ── Expanders ── */
+    .stExpander { background-color: #161b22 !important; border: 1px solid #30363d !important; border-radius: 8px !important; }
+    .stExpander summary, details summary span, .stExpander summary p {
+        color: #111111 !important;
+        background-color: #d0d0d0 !important;
+        border-radius: 6px !important;
     }
-    .stExpander {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 8px;
-    }
-    .stExpander summary, .stExpander summary p,
-    .stExpander [data-testid="stExpanderToggleIcon"],
-    details summary span {
-        color: #000000 !important;
-        background-color: #d0d0d0;
-        border-radius: 6px;
-    }
-    /* Make all grey/muted text white */
-    .stCaption, [data-testid="stCaptionContainer"] p,
-    [data-testid="stCaptionContainer"], small,
-    .stMarkdown p, p, label, span {
-        color: #ffffff !important;
-    }
+
+    /* ── Chat messages ── */
+    [data-testid="stChatMessage"] { background-color: #161b22 !important; border: 1px solid #30363d !important; border-radius: 8px !important; }
+
+    /* ── Status / alerts ── */
+    [data-testid="stStatus"] { background-color: #1e2130 !important; border: 1px solid #30363d !important; }
+    [data-testid="stAlert"] { background-color: #1e2130 !important; }
+
+    /* ── Selectbox / dropdown ── */
+    [data-testid="stSelectbox"] > div > div { background-color: #1e2130 !important; color: #ffffff !important; border: 1px solid #444444 !important; }
+
+    /* ── Divider ── */
+    hr { border-color: #30363d !important; }
     </style>
 """, unsafe_allow_html=True)
 
