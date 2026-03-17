@@ -1,15 +1,13 @@
 import streamlit as st
-from supabase import create_client, Client
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
 from google.genai import types
 import requests
-import stripe
 import os
 from pathlib import Path
 
-st.set_page_config(page_title="AI Conductor", page_icon="conductor_logo.png", layout="centered")
+st.set_page_config(page_title="AI Conductor", page_icon="🎼", layout="centered")
 
 st.markdown("""
     <style>
@@ -44,16 +42,22 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ==================== Supabase Setup ====================
-supabase_url = os.environ.get("SUPABASE_URL")
-supabase_key = os.environ.get("SUPABASE_ANON_KEY")
+LOGO_PATH = str(Path(__file__).parent / "conductor_logo.png")
 
-if not supabase_url or not supabase_key:
+# ==================== Supabase Setup (direct REST) ====================
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
     st.error("Supabase credentials not found. Add SUPABASE_URL and SUPABASE_ANON_KEY to secrets.")
     st.stop()
 
-supabase: Client = create_client(supabase_url, supabase_key)
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+AUTH_HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+}
 
 # ==================== Stripe Price IDs ====================
 STRIPE_BASIC_PRICE_ID = "price_1TBMRNFC68YihsMHbAOq7jGj"  # $9/month — Basic
@@ -71,20 +75,61 @@ if "free_trial_used" not in st.session_state:
 if "checkout_url" not in st.session_state:
     st.session_state.checkout_url = None
 
+# ==================== Auth Helpers ====================
+def supabase_login(email: str, password: str):
+    r = requests.post(
+        f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+        headers=AUTH_HEADERS,
+        json={"email": email, "password": password},
+        timeout=10,
+    )
+    if r.status_code == 200:
+        return r.json().get("user"), None
+    return None, r.json().get("error_description", r.json().get("msg", "Login failed."))
+
+def supabase_signup(email: str, password: str):
+    r = requests.post(
+        f"{SUPABASE_URL}/auth/v1/signup",
+        headers=AUTH_HEADERS,
+        json={"email": email, "password": password},
+        timeout=10,
+    )
+    data = r.json()
+    if r.status_code == 200:
+        user = data if data.get("id") else data.get("user")
+        if user:
+            return user, None
+        return None, "This email is already registered. Please log in instead."
+    return None, data.get("error_description", data.get("msg", data.get("error", "Sign up failed.")))
+
 # ==================== Credits Helpers ====================
 def get_credits(user_id: str) -> int:
     try:
-        res = supabase.table("credits").select("balance").eq("user_id", user_id).execute()
-        if res.data:
-            return res.data[0]["balance"]
-        supabase.table("credits").insert({"user_id": user_id, "balance": 10}).execute()
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/credits?user_id=eq.{user_id}&select=balance",
+            headers=AUTH_HEADERS, timeout=10,
+        )
+        data = r.json()
+        if data:
+            return data[0]["balance"]
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/credits",
+            headers=AUTH_HEADERS,
+            json={"user_id": user_id, "balance": 10},
+            timeout=10,
+        )
         return 10
     except Exception:
         return 0
 
 def set_credits(user_id: str, new_balance: int):
     try:
-        supabase.table("credits").update({"balance": new_balance}).eq("user_id", user_id).execute()
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/credits?user_id=eq.{user_id}",
+            headers=AUTH_HEADERS,
+            json={"balance": new_balance},
+            timeout=10,
+        )
     except Exception:
         pass
 
@@ -109,31 +154,47 @@ def get_base_url() -> str:
     domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
     return f"https://{domain}" if domain else "http://localhost:8501"
 
+def _stripe_key() -> str:
+    return os.environ.get("STRIPE_SECRET_KEY", "")
+
 def create_stripe_session(price_id: str, mode: str, user_email: str, user_id: str, credits_grant: int) -> str:
     base_url = get_base_url()
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=[{"price": price_id, "quantity": 1}],
-        mode=mode,
-        success_url=f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}&credits={credits_grant}&mode={mode}",
-        cancel_url=f"{base_url}?payment=cancelled",
-        customer_email=user_email,
-        client_reference_id=user_id,
+    key = _stripe_key()
+    success_url = f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}&credits={credits_grant}&mode={mode}"
+    fields = [
+        ("line_items[0][price]",    price_id),
+        ("line_items[0][quantity]", "1"),
+        ("mode",                    mode),
+        ("success_url",             success_url),
+        ("cancel_url",              f"{base_url}?payment=cancelled"),
+        ("client_reference_id",     user_id),
+    ]
+    if user_email:
+        fields.append(("customer_email", user_email))
+    r = requests.post(
+        "https://api.stripe.com/v1/checkout/sessions",
+        auth=(key, ""), data=fields, timeout=15,
     )
-    return session.url
+    if not r.ok:
+        err = r.json().get("error", {}).get("message", r.text)
+        raise ValueError(f"Stripe error: {err}")
+    return r.json()["url"]
 
 def verify_stripe_session(session_id: str, mode: str) -> bool:
     try:
-        session = stripe.checkout.Session.retrieve(session_id)
-        if mode == "subscription":
-            return session.status == "complete"
-        return session.payment_status == "paid"
+        r = requests.get(
+            f"https://api.stripe.com/v1/checkout/sessions/{session_id}",
+            auth=(_stripe_key(), ""), timeout=10,
+        )
+        r.raise_for_status()
+        data = r.json()
+        return data.get("status") == "complete" if mode == "subscription" else data.get("payment_status") == "paid"
     except Exception:
         return False
 
 # ==================== Auth UI ====================
 def show_auth():
-    st.image("conductor_logo.png", width=180)
+    st.image(LOGO_PATH, width=180)
     st.title("AI Conductor")
     st.caption("One task → Multiple AIs → Best plan + execution")
     st.divider()
@@ -144,15 +205,13 @@ def show_auth():
         email = st.text_input("Email", key="login_email")
         password = st.text_input("Password", type="password", key="login_pw")
         if st.button("Log In", use_container_width=True):
-            try:
-                response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                if response.user:
-                    st.session_state.user = response.user
+            if email and password:
+                user, err = supabase_login(email, password)
+                if user:
+                    st.session_state.user = user
                     st.rerun()
                 else:
-                    st.error("Login failed.")
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+                    st.error(f"Login failed: {err}")
 
     with tab_signup:
         new_email = st.text_input("Email", key="signup_email")
@@ -164,14 +223,11 @@ def show_auth():
             elif len(new_password) < 8:
                 st.error("Password must be at least 8 characters.")
             else:
-                try:
-                    response = supabase.auth.sign_up({"email": new_email, "password": new_password})
-                    if response.user:
-                        st.success("Account created! Check your email to confirm, then log in.")
-                    else:
-                        st.error("Sign up failed — email may already be in use.")
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
+                user, err = supabase_signup(new_email, new_password)
+                if user:
+                    st.success("Account created! Check your email to confirm, then log in.")
+                else:
+                    st.error(f"Sign up failed: {err}")
 
 # ==================== Upgrade Page ====================
 def show_upgrade(user_email: str, user_id: str, balance: int):
@@ -318,7 +374,7 @@ if st.session_state.user:
 
     # ---- Sidebar ----
     with st.sidebar:
-        st.image("conductor_logo.png", width=100)
+        st.image(LOGO_PATH, width=100)
         st.caption(f"Signed in as **{user_email}**")
         st.divider()
         st.header("Choose Your Plan")
@@ -377,7 +433,6 @@ if st.session_state.user:
             st.session_state.messages = []
             st.rerun()
         if st.button("🚪 Log Out"):
-            supabase.auth.sign_out()
             st.session_state.user = None
             st.session_state.messages = []
             st.session_state.page = "chat"
@@ -387,7 +442,7 @@ if st.session_state.user:
         show_upgrade(user_email, user_id, balance)
         st.stop()
 
-    st.image("conductor_logo.png", width=180)
+    st.image(LOGO_PATH, width=180)
     st.title("AI Conductor")
     st.caption("One task → Claude · Gemini · Cohere · Mistral → Best combined plan")
 
