@@ -390,16 +390,13 @@ def get_claude(temperature: float = 0.3):
 
 @st.cache_resource
 def get_gemini_client():
-    api_key = _secret("GEMINI_API_KEY") or _secret("AI_INTEGRATIONS_GEMINI_API_KEY")
-    base_url = _secret("AI_INTEGRATIONS_GEMINI_BASE_URL")
-    if base_url:
-        from google.genai import types
-        return genai.Client(api_key=api_key,
-                            http_options=types.HttpOptions(base_url=base_url, api_version=""))
+    api_key = _secret("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY not configured.")
     return genai.Client(api_key=api_key)
 
 def ask_gemini(prompt: str) -> str:
-    return get_gemini_client().models.generate_content(model="gemini-2.0-flash", contents=prompt).text or ""
+    return get_gemini_client().models.generate_content(model="gemini-2.5-flash", contents=prompt).text or ""
 
 def ask_cohere(prompt: str) -> str:
     api_key = _secret("COHERE_API_KEY")
@@ -432,8 +429,8 @@ def call_ai_safely(name: str, fn, prompt: str, status_widget):
         result = fn(prompt)
         status_widget.update(label=f"✅ {name} answered")
         return result, True
-    except Exception:
-        status_widget.update(label=f"⚠️ {name} unavailable — skipped")
+    except Exception as e:
+        status_widget.update(label=f"⚠️ {name} skipped — {str(e)[:80]}")
         return "", False
 
 # ==================== Main App ====================
