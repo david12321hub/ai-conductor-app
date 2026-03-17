@@ -18,15 +18,17 @@ st.markdown("""
         font-family: 'Helvetica Neue', sans-serif;
     }
     .stButton > button {
-        background-color: #00d4ff;
-        color: black;
+        background-color: #2e2e2e;
+        color: #ffffff;
         border-radius: 8px;
         padding: 10px 24px;
         font-weight: bold;
+        border: 1px solid #444444;
     }
     .stButton > button:hover {
-        background-color: #00b8d9;
-        color: black;
+        background-color: #3d3d3d;
+        color: #ffffff;
+        border: 1px solid #555555;
     }
     section[data-testid="stSidebar"] {
         background-color: #161b22;
