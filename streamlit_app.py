@@ -30,6 +30,20 @@ st.markdown("""
         color: #ffffff;
         border: 1px solid #555555;
     }
+    .stLinkButton a, [data-testid="stLinkButton"] a {
+        background-color: #2e2e2e !important;
+        color: #ffffff !important;
+        border-radius: 8px;
+        padding: 10px 24px;
+        font-weight: bold;
+        border: 1px solid #444444;
+        text-decoration: none;
+        display: inline-block;
+    }
+    .stLinkButton a:hover, [data-testid="stLinkButton"] a:hover {
+        background-color: #3d3d3d !important;
+        color: #ffffff !important;
+    }
     section[data-testid="stSidebar"] {
         background-color: #161b22;
         border-right: 1px solid #30363d;
@@ -248,13 +262,13 @@ def show_auth():
 
 # ==================== Upgrade Page ====================
 def show_upgrade(user_email: str, user_id: str, balance: int):
-    st.title("💳 Upgrade for More")
+    st.title(" Upgrade for More")
     st.caption(f"Current balance: {balance} credit(s) • Free tier: 10 queries. Unlock unlimited + priority models.")
     st.divider()
 
     if st.session_state.checkout_url:
         st.success("Your secure checkout is ready!")
-        st.link_button("🔒 Pay securely with Stripe →", st.session_state.checkout_url, use_container_width=True)
+        st.link_button(" Pay securely with Stripe →", st.session_state.checkout_url, use_container_width=True)
         if st.button("← Choose a different plan"):
             st.session_state.checkout_url = None
             st.rerun()
