@@ -129,8 +129,9 @@ AUTH_HEADERS = {
 }
 
 # ==================== Stripe Price IDs ====================
-STRIPE_BASIC_PRICE_ID = "price_1TBMRNFC68YihsMHbAOq7jGj" # $9/month — Basic
-STRIPE_PRO_PRICE_ID = "price_1TBMROFC68YihsMHDom1cias" # $29/month — Pro
+STRIPE_BASIC_PRICE_ID        = "price_1TBMRNFC68YihsMHbAOq7jGj"  # $9/mo  — Basic
+STRIPE_PRO_PRICE_ID          = "price_REPLACE_WITH_49_MONTHLY"    # $49/mo — Pro Unlimited
+STRIPE_ENTERPRISE_PRICE_ID   = "price_REPLACE_WITH_149_MONTHLY"   # $149/mo — Enterprise Unlimited
 
 # ==================== Session State ====================
 if "user" not in st.session_state:
@@ -337,10 +338,10 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
                     st.error(f"Payment setup error: {str(e)}")
 
     with col2:
-        st.markdown("### Pro")
-        st.markdown("$29 / month")
-        st.markdown("- 1,000+ queries / month\n- All 4 AI models\n- Custom agents\n- Priority processing\n- Cancel anytime")
-        if st.button("Choose Pro — $29/mo", use_container_width=True, key="buy_pro"):
+        st.markdown("### Pro Unlimited")
+        st.markdown("$49 / month")
+        st.markdown("- Unlimited light use\n- 10K tokens/day\n- All 4 AI models\n- Custom agents\n- Priority processing\n- Cancel anytime")
+        if st.button("Choose Pro Unlimited — $49/mo", use_container_width=True, key="buy_pro"):
             with st.spinner("Creating checkout..."):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -350,11 +351,17 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
                     st.error(f"Payment setup error: {str(e)}")
 
     with col3:
-        st.markdown("### Enterprise")
-        st.markdown("Custom pricing")
-        st.markdown("- Unlimited queries\n- API access\n- Dedicated support\n- Custom integrations\n- SLA guarantee")
-        if st.button("Contact Us", use_container_width=True, key="buy_enterprise"):
-            st.info(" Email us at support@aiconductorapp.com to discuss your needs.")
+        st.markdown("### Enterprise Unlimited")
+        st.markdown("$149 / month")
+        st.markdown("- 50K tokens/day\n- Priority processing\n- API access\n- Dedicated support\n- Custom integrations\n- SLA guarantee")
+        if st.button("Choose Enterprise — $149/mo", use_container_width=True, key="buy_enterprise"):
+            with st.spinner("Creating checkout..."):
+                try:
+                    url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
+                    st.session_state.checkout_url = url
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Payment setup error: {str(e)}")
 
     st.divider()
     st.caption("Payments processed securely by Stripe. Test card: `4242 4242 4242 4242` · any future date · any CVC.")
@@ -364,11 +371,11 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 
 # ==================== Plans (main area) ====================
 def show_plans(user_email: str, user_id: str):
-    st.subheader("Upgrade Your Plan")
+    st.subheader("Choose Your Plan")
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-        st.markdown(" Free Trial")
+        st.markdown("Free Trial")
         st.caption("One-time free query")
         if st.button("Start Free Trial", key="plan_trial", use_container_width=True):
             if not st.session_state.get("free_trial_used"):
@@ -378,7 +385,7 @@ def show_plans(user_email: str, user_id: str):
                 st.warning("Already used — upgrade to continue.")
 
     with c2:
-        st.markdown(" Basic")
+        st.markdown("Basic")
         st.caption("$9/mo · 500 queries")
         if st.button("Choose Basic", key="plan_basic", use_container_width=True):
             try:
@@ -390,8 +397,8 @@ def show_plans(user_email: str, user_id: str):
                 st.error(str(e))
 
     with c3:
-        st.markdown(" Pro")
-        st.caption("$29/mo · 1,000+")
+        st.markdown("Pro Unlimited")
+        st.caption("$49/mo · 10K tokens/day")
         if st.button("Choose Pro", key="plan_pro", use_container_width=True):
             try:
                 url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -402,10 +409,16 @@ def show_plans(user_email: str, user_id: str):
                 st.error(str(e))
 
     with c4:
-        st.markdown(" Enterprise")
-        st.caption("Custom · Unlimited")
-        if st.button("Contact Us", key="plan_ent", use_container_width=True):
-            st.info(" support@aiconductorapp.com")
+        st.markdown("Enterprise Unlimited")
+        st.caption("$149/mo · 50K tokens/day")
+        if st.button("Choose Enterprise", key="plan_ent", use_container_width=True):
+            try:
+                url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
+                st.session_state.checkout_url = url
+                st.session_state.page = "upgrade"
+                st.rerun()
+            except Exception as e:
+                st.error(str(e))
 
     st.divider()
 
@@ -512,8 +525,8 @@ if st.session_state.user:
 
         sc1, sc2, sc3 = st.columns(3)
         with sc1:
-            st.markdown(" Basic")
-            st.caption("$9/mo · 500 queries")
+            st.markdown("Basic")
+            st.caption("$9/mo")
             if st.button("Choose", key="sb_basic", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
@@ -523,8 +536,8 @@ if st.session_state.user:
                 except Exception as e:
                     st.error(str(e))
         with sc2:
-            st.markdown(" Pro")
-            st.caption("$29/mo · 1,000+")
+            st.markdown("Pro Unlimited")
+            st.caption("$49/mo")
             if st.button("Choose", key="sb_pro", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -534,10 +547,16 @@ if st.session_state.user:
                 except Exception as e:
                     st.error(str(e))
         with sc3:
-            st.markdown(" Ent.")
-            st.caption("Custom")
-            if st.button("Contact", key="sb_ent", use_container_width=True):
-                st.info(" support@aiconductorapp.com")
+            st.markdown("Enterprise")
+            st.caption("$149/mo")
+            if st.button("Choose", key="sb_ent", use_container_width=True):
+                try:
+                    url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
+                    st.session_state.checkout_url = url
+                    st.session_state.page = "upgrade"
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
 
         st.divider()
         credit_color = "" if balance > 5 else ("" if balance > 0 else "")
@@ -568,10 +587,10 @@ if st.session_state.user:
     show_plans(user_email, user_id)
 
     if balance <= 0:
-        st.error(" You're out of credits.")
+        st.error("You're out of credits. Choose a plan below to continue.")
         col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button(" Basic — $9/mo", use_container_width=True):
+            if st.button("Basic — $9/mo", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
                     st.session_state.checkout_url = url
@@ -580,7 +599,7 @@ if st.session_state.user:
                 except Exception as e:
                     st.error(str(e))
         with col2:
-            if st.button(" Pro — $29/mo", use_container_width=True):
+            if st.button("Pro Unlimited — $49/mo", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
                     st.session_state.checkout_url = url
@@ -589,9 +608,17 @@ if st.session_state.user:
                 except Exception as e:
                     st.error(str(e))
         with col3:
-            if st.button(" Enterprise", use_container_width=True):
-                st.info(" support@aiconductorapp.com")
+            if st.button("Enterprise — $149/mo", use_container_width=True):
+                try:
+                    url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
+                    st.session_state.checkout_url = url
+                    st.session_state.page = "upgrade"
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
         st.stop()
+    elif balance < 10:
+        st.warning(f"Low credits ({balance} remaining) — consider upgrading your plan.")
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
