@@ -33,12 +33,21 @@ st.markdown("""
         border: 1px solid #444444 !important;
         border-radius: 6px !important;
     }
+    [data-testid="stChatInput"] {
+        background-color: #90EE90 !important;
+        padding: 8px !important;
+        border-radius: 10px !important;
+    }
     [data-testid="stChatInput"] > div,
-    [data-testid="stChatInputContainer"],
+    [data-testid="stChatInputContainer"] {
+        background-color: #90EE90 !important;
+    }
+    [data-testid="stChatInput"] textarea,
     .stChatInput textarea {
-        background-color: #1e2130 !important;
-        color: #ffffff !important;
-        border: 1px solid #444444 !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #aaaaaa !important;
+        border-radius: 6px !important;
     }
 
     /* ── Tabs ── */
