@@ -496,6 +496,7 @@ if st.session_state.user:
     st.image("conductor_logo.png", width=180)
     st.title("AI Conductor")
     st.caption("One task → Claude · Gemini · Cohere · Mistral → Best combined plan")
+    st.markdown("Welcome! Type any task or question below — AI Conductor will handle the rest.")
 
     show_plans(user_email, user_id)
 
