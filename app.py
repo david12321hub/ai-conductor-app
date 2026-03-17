@@ -285,6 +285,53 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
         st.session_state.page = "chat"
         st.rerun()
 
+# ==================== Plans (main area) ====================
+def show_plans(user_email: str, user_id: str):
+    st.subheader("Upgrade Your Plan")
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        st.markdown("**🎁 Free Trial**")
+        st.caption("One-time free query")
+        if st.button("Start Free Trial", key="plan_trial", use_container_width=True):
+            if not st.session_state.get("free_trial_used"):
+                st.session_state.free_trial_used = True
+                st.success("Free trial activated! Ask your question below.")
+            else:
+                st.warning("Already used — upgrade to continue.")
+
+    with c2:
+        st.markdown("**⚡ Basic**")
+        st.caption("$9/mo · 500 queries")
+        if st.button("Choose Basic", key="plan_basic", use_container_width=True):
+            try:
+                url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
+                st.session_state.checkout_url = url
+                st.session_state.page = "upgrade"
+                st.rerun()
+            except Exception as e:
+                st.error(str(e))
+
+    with c3:
+        st.markdown("**🚀 Pro**")
+        st.caption("$29/mo · 1,000+")
+        if st.button("Choose Pro", key="plan_pro", use_container_width=True):
+            try:
+                url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
+                st.session_state.checkout_url = url
+                st.session_state.page = "upgrade"
+                st.rerun()
+            except Exception as e:
+                st.error(str(e))
+
+    with c4:
+        st.markdown("**🏢 Enterprise**")
+        st.caption("Custom · Unlimited")
+        if st.button("Contact Us", key="plan_ent", use_container_width=True):
+            st.info("📧 support@aiconductorapp.com")
+
+    st.divider()
+
 # ==================== AI Clients ====================
 @st.cache_resource
 def get_claude(temperature: float = 0.3):
@@ -445,6 +492,8 @@ if st.session_state.user:
     st.image(LOGO_PATH, width=180)
     st.title("AI Conductor")
     st.caption("One task → Claude · Gemini · Cohere · Mistral → Best combined plan")
+
+    show_plans(user_email, user_id)
 
     if balance <= 0:
         st.error("🔴 You're out of credits.")

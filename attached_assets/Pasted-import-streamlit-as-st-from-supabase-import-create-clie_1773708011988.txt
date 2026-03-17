@@ -1,0 +1,185 @@
+import streamlit as st
+from supabase import create_client, Client
+from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
+import os
+from dotenv import load_dotenv
+import stripe
+import ast  # For safe code parsing
+import io  # For capturing output
+
+load_dotenv()
+
+# ==================== Styling to Match Carrd ====================
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #0e1117;
+        color: #ffffff;
+    }
+    h1, h2, h3 {
+        color: #00d4ff;
+    }
+    .stButton > button {
+        background-color: #00d4ff;
+        color: black;
+        border-radius: 8px;
+    }
+    section[data-testid="stSidebar"] {
+        background-color: #161b22;
+    }
+    .stExpander {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==================== App Header with Image ====================
+st.image("conductor_image.png", width=300)
+st.title("AI Conductor")
+st.caption("One task → Multiple AIs → Best plan + execution")
+
+# ==================== Supabase Setup ====================
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_ANON_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# ==================== Session State ====================
+if 'user' not in st.session_state:
+    st.session_state.user = None
+if 'usage_count' not in st.session_state:
+    st.session_state.usage_count = 0
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+if 'free_trial_used' not in st.session_state:
+    st.session_state.free_trial_used = False
+
+# ==================== Auth UI ====================
+def show_auth():
+    tab1, tab2 = st.tabs(["Log In", "Sign Up"])
+
+    with tab1:
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_pw")
+        if st.button("Log In"):
+            try:
+                response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                if response.user:
+                    st.session_state.user = response.user
+                    st.success(f"Welcome back!")
+                    st.rerun()
+            except:
+                st.error("Invalid credentials")
+
+    with tab2:
+        new_email = st.text_input("Email", key="signup_email")
+        new_password = st.text_input("Password", type="password", key="signup_pw")
+        confirm_pw = st.text_input("Confirm Password", type="password", key="signup_confirm")
+        if st.button("Create Account"):
+            if new_password != confirm_pw:
+                st.error("Passwords don't match")
+            elif len(new_password) < 8:
+                st.error("Password too short")
+            else:
+                try:
+                    response = supabase.auth.sign_up({"email": new_email, "password": new_password})
+                    if response.user:
+                        st.success("Account created! Check email to confirm then log in.")
+                except:
+                    st.error("Sign up failed — email in use?")
+
+# ==================== Payment Tiers (example with your IDs) ====================
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+def show_plans():
+    st.header("Upgrade Your Plan")
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.subheader("Free Trial")
+        st.write("One-time free query")
+        if st.button("Start Free Trial"):
+            if not st.session_state.free_trial_used:
+                st.session_state.free_trial_used = True
+                st.success("Free trial activated! Ask your question.")
+            else:
+                st.warning("You've used your free trial.")
+
+    with col2:
+        st.subheader("Basic")
+        st.write("$9/month")
+        if st.button("Choose Basic"):
+            session = stripe.checkout.Session.create(
+                line_items=[{'price': 'price_1TBMRNFC68YihsMHbAOq7jGj', 'quantity': 1}],
+                mode='subscription',
+                success_url='https://aiconductorapp.com/success',
+                cancel_url='https://aiconductorapp.com/cancel',
+            )
+            st.markdown(f"[Pay Now →]({session.url})")
+
+    with col3:
+        st.subheader("Pro")
+        st.write("$29/month")
+        if st.button("Choose Pro"):
+            session = stripe.checkout.Session.create(
+                line_items=[{'price': 'price_1TBMROFC68YihsMHDom1cias', 'quantity': 1}],
+                mode='subscription',
+                success_url='https://aiconductorapp.com/success',
+                cancel_url='https://aiconductorapp.com/cancel',
+            )
+            st.markdown(f"[Pay Now →]({session.url})")
+
+    with col4:
+        st.subheader("Enterprise")
+        st.write("Custom")
+        if st.button("Contact Us"):
+            st.info("Email support@aiconductorapp.com for custom pricing.")
+
+# ==================== Main App ====================
+if st.session_state.user:
+    show_plans()
+
+    MAX_FREE = 10 if not st.session_state.free_trial_used else 0
+    if st.session_state.usage_count >= MAX_FREE:
+        st.warning("Free limit reached. Upgrade to continue!")
+        st.stop()
+
+    # Your existing chat / conductor logic
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    if prompt := st.chat_input("What would you like to build or solve?"):
+        st.session_state.usage_count += 1
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            with st.spinner("Conductor is working..."):
+                # Your query parallel, synthesize, agents code here...
+
+                # After agents, add Execute button
+                if st.button("Execute Plan"):
+                    with st.spinner("Executing..."):
+                        # Safe code executor (extract code from code_agent output)
+                        try:
+                            # Assume code_agent is the generated code string
+                            code = code_agent.split("```python")[1].split("```")[0].strip()  # Extract code block
+                            output = io.StringIO()
+                            exec(code, {"print": output.write})  # Safe exec in restricted namespace
+                            st.write("Execution Result:")
+                            st.code(output.getvalue())
+                        except Exception as e:
+                            st.error(f"Execution failed: {str(e)}")
+
+    if st.button("Logout"):
+        supabase.auth.sign_out()
+        st.session_state.user = None
+        st.rerun()
+
+else:
+    show_auth()
