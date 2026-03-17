@@ -247,7 +247,7 @@ def show_auth():
 # ==================== Upgrade Page ====================
 def show_upgrade(user_email: str, user_id: str, balance: int):
     st.title("💳 Upgrade for More")
-    st.caption(f"Current balance: **{balance} credit(s)** • Free tier: 10 queries. Unlock unlimited + priority models.")
+    st.caption(f"Current balance: {balance} credit(s) • Free tier: 10 queries. Unlock unlimited + priority models.")
     st.divider()
 
     if st.session_state.checkout_url:
@@ -263,7 +263,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 
     with col1:
         st.markdown("### Basic")
-        st.markdown("**$9 / month**")
+        st.markdown("$9 / month")
         st.markdown("- 500 queries / month\n- All 4 AI models\n- Basic agents\n- Download results\n- Cancel anytime")
         if st.button("Choose Basic — $9/mo", use_container_width=True, key="buy_basic"):
             with st.spinner("Creating checkout..."):
@@ -276,7 +276,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 
     with col2:
         st.markdown("### Pro")
-        st.markdown("**$29 / month**")
+        st.markdown("$29 / month")
         st.markdown("- 1,000+ queries / month\n- All 4 AI models\n- Custom agents\n- Priority processing\n- Cancel anytime")
         if st.button("Choose Pro — $29/mo", use_container_width=True, key="buy_pro"):
             with st.spinner("Creating checkout..."):
@@ -289,10 +289,10 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 
     with col3:
         st.markdown("### Enterprise")
-        st.markdown("**Custom pricing**")
+        st.markdown("Custom pricing")
         st.markdown("- Unlimited queries\n- API access\n- Dedicated support\n- Custom integrations\n- SLA guarantee")
         if st.button("Contact Us", use_container_width=True, key="buy_enterprise"):
-            st.info(" Email us at **support@aiconductorapp.com** to discuss your needs.")
+            st.info(" Email us at support@aiconductorapp.com to discuss your needs.")
 
     st.divider()
     st.caption("Payments processed securely by Stripe. Test card: `4242 4242 4242 4242` · any future date · any CVC.")
@@ -306,7 +306,7 @@ def show_plans(user_email: str, user_id: str):
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-        st.markdown("** Free Trial**")
+        st.markdown(" Free Trial")
         st.caption("One-time free query")
         if st.button("Start Free Trial", key="plan_trial", use_container_width=True):
             if not st.session_state.get("free_trial_used"):
@@ -316,7 +316,7 @@ def show_plans(user_email: str, user_id: str):
                 st.warning("Already used — upgrade to continue.")
 
     with c2:
-        st.markdown("** Basic**")
+        st.markdown(" Basic")
         st.caption("$9/mo · 500 queries")
         if st.button("Choose Basic", key="plan_basic", use_container_width=True):
             try:
@@ -328,7 +328,7 @@ def show_plans(user_email: str, user_id: str):
                 st.error(str(e))
 
     with c3:
-        st.markdown("** Pro**")
+        st.markdown(" Pro")
         st.caption("$29/mo · 1,000+")
         if st.button("Choose Pro", key="plan_pro", use_container_width=True):
             try:
@@ -340,7 +340,7 @@ def show_plans(user_email: str, user_id: str):
                 st.error(str(e))
 
     with c4:
-        st.markdown("** Enterprise**")
+        st.markdown(" Enterprise")
         st.caption("Custom · Unlimited")
         if st.button("Contact Us", key="plan_ent", use_container_width=True):
             st.info(" support@aiconductorapp.com")
@@ -426,7 +426,7 @@ if st.session_state.user:
             if credits_to_add >= 9999:
                 st.success("🎉 Pro subscription activated! Unlimited queries unlocked.")
             else:
-                st.success(f"🎉 Payment successful! {credits_to_add} credits added. Balance: **{balance}**")
+                st.success(f"🎉 Payment successful! {credits_to_add} credits added. Balance: {balance}")
         elif session_id:
             st.query_params.clear()
             st.warning("Payment could not be verified. Contact support if you were charged.")
@@ -437,7 +437,7 @@ if st.session_state.user:
     # ---- Sidebar ----
     with st.sidebar:
         st.image(LOGO_PATH, width=100)
-        st.caption(f"Signed in as **{user_email}**")
+        st.caption(f"Signed in as {user_email}")
         st.divider()
         st.header("Choose Your Plan")
         st.caption("Start free or upgrade for unlimited access.")
@@ -456,7 +456,7 @@ if st.session_state.user:
 
         sc1, sc2, sc3 = st.columns(3)
         with sc1:
-            st.markdown("** Basic**")
+            st.markdown(" Basic")
             st.caption("$9/mo · 500 queries")
             if st.button("Choose", key="sb_basic", use_container_width=True):
                 try:
@@ -467,7 +467,7 @@ if st.session_state.user:
                 except Exception as e:
                     st.error(str(e))
         with sc2:
-            st.markdown("** Pro**")
+            st.markdown(" Pro")
             st.caption("$29/mo · 1,000+")
             if st.button("Choose", key="sb_pro", use_container_width=True):
                 try:
@@ -478,7 +478,7 @@ if st.session_state.user:
                 except Exception as e:
                     st.error(str(e))
         with sc3:
-            st.markdown("** Ent.**")
+            st.markdown(" Ent.")
             st.caption("Custom")
             if st.button("Contact", key="sb_ent", use_container_width=True):
                 st.info(" support@aiconductorapp.com")
@@ -487,7 +487,7 @@ if st.session_state.user:
         credit_color = "" if balance > 5 else ("" if balance > 0 else "")
         st.metric("Credits", f"{credit_color} {balance}")
         st.divider()
-        st.markdown("**Active AI Models:**")
+        st.markdown("Active AI Models:")
         st.write(" Claude · Gemini")
         st.write(" Cohere · Mistral")
         st.divider()
@@ -586,7 +586,7 @@ if st.session_state.user:
                     s5.update(label=f"✅ Plan synthesized from {ai_count} AI response(s)")
 
                 balance = deduct_credit(user_id, balance)
-                st.markdown("** Synthesized Plan:**")
+                st.markdown(" Synthesized Plan:")
                 st.write(plan)
 
                 s6 = st.status("💻 Running Code Agent...", expanded=False)
@@ -612,11 +612,11 @@ if st.session_state.user:
                               (["Cohere"] if cohere_ok else []) + (["Mistral"] if mistral_ok else []))
 
                 final = (
-                    f"**Final Result** *(synthesized from {', '.join(active_ais)})*\n\n"
-                    f"**Plan Summary:**\n{plan}\n\n"
-                    f"**Code Agent Output:**\n```python\n{code_agent}\n```\n\n"
-                    f"**Planning Agent Output:**\n{planning_agent}\n\n"
-                    f"**Recommended Next Step:** Save the code above and run it!\n"
+                    f"Final Result *(synthesized from {', '.join(active_ais)})*\n\n"
+                    f"Plan Summary:\n{plan}\n\n"
+                    f"Code Agent Output:\n```python\n{code_agent}\n```\n\n"
+                    f"Planning Agent Output:\n{planning_agent}\n\n"
+                    f"Recommended Next Step: Save the code above and run it!\n"
                 )
                 with open(Path(__file__).parent / "conductor_result.md", "w", encoding="utf-8") as f:
                     f.write(f"# Question\n{prompt}\n\n{final}")
