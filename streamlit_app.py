@@ -203,25 +203,33 @@ st.markdown("""
     div[data-baseweb="notification"][kind="info"],
     .stInfo > div { background-color: #0a1a2a !important; border-left: 4px solid #3b82f6 !important; }
 
-    /* ── Selectbox / dropdown — white box, black text ── */
+    /* ── Selectbox label — white text, no box ── */
+    [data-testid="stSelectbox"] label,
+    [data-testid="stSelectbox"] label p,
+    [data-testid="stSelectbox"] label span {
+        color: #ffffff !important;
+        background-color: transparent !important;
+    }
+    /* ── Selectbox closed — transparent background, white selected value ── */
     [data-testid="stSelectbox"] > div > div,
     [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
     [data-baseweb="select"],
     [data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #cccccc !important;
+        background-color: transparent !important;
+        color: #ffffff !important;
+        border: 1px solid #444c56 !important;
     }
     [data-testid="stSelectbox"] span,
     [data-testid="stSelectbox"] div,
     [data-testid="stSelectbox"] p,
     [data-baseweb="select"] span,
     [data-baseweb="select"] div {
-        color: #000000 !important;
-        background-color: #ffffff !important;
+        color: #ffffff !important;
+        background-color: transparent !important;
     }
     [data-testid="stSelectbox"] svg,
-    [data-baseweb="select"] svg { fill: #000000 !important; color: #000000 !important; }
+    [data-baseweb="select"] svg { fill: #ffffff !important; }
+    /* ── Selectbox open dropdown — white background, black text ── */
     [data-baseweb="popover"],
     [data-baseweb="popover"] ul,
     [data-baseweb="popover"] [data-baseweb="menu"] {
