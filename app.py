@@ -266,7 +266,7 @@ def create_stripe_payg_session(amount_dollars: int, user_email: str, user_id: st
     key = _stripe_key()
     success_url = (
         f"{base_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}"
-        f"&credits={credits_grant}&mode=payment"
+        f"&credits={credits_grant}&mode=payment&amount={amount_dollars}"
     )
     fields = [
         ("line_items[0][price_data][currency]", "usd"),
@@ -521,14 +521,23 @@ if st.session_state.user:
         session_id = params.get("session_id", "")
         credits_to_add = int(params.get("credits", "0"))
         mode = params.get("mode", "payment")
+        paid_amount = float(params.get("amount", "0") or "0")
         if session_id and verify_stripe_session(session_id, mode):
             balance = add_credits(user_id, balance, credits_to_add)
             st.session_state.checkout_url = None
             st.query_params.clear()
             if credits_to_add >= 9999:
-                st.success("🎉 Pro subscription activated! Unlimited queries unlocked.")
+                st.success("Payment successful! Your subscription is now active — unlimited queries unlocked.")
+            elif paid_amount > 0:
+                credit_value = paid_amount * 0.5
+                profit = paid_amount * 0.5
+                st.success(
+                    f"Payment successful! ${credit_value:.2f} in credits added to your account "
+                    f"({credits_to_add} queries). Profit retained: ${profit:.2f}. "
+                    f"New balance: {balance} credits."
+                )
             else:
-                st.success(f"🎉 Payment successful! {credits_to_add} credits added. Balance: {balance}")
+                st.success(f"Payment successful! {credits_to_add} credits added. Balance: {balance}")
         elif session_id:
             st.query_params.clear()
             st.warning("Payment could not be verified. Contact support if you were charged.")
