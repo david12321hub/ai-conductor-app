@@ -12,27 +12,31 @@ st.set_page_config(page_title="AI Conductor", page_icon="", layout="centered")
 st.markdown("""
     <style>
     /* ── Base ── */
-    .stApp, .stApp > div { background-color: #0e1117 !important; color: #ffffff !important; }
+    .stApp, .stApp > div { background-color: #0e1117 !important; color: #e6edf3 !important; }
     header[data-testid="stHeader"] { background-color: #0e1117 !important; }
     footer { display: none !important; }
 
     /* ── Text ── */
     h1, h2, h3, h4, h5, h6 { color: #00d4ff !important; font-family: 'Helvetica Neue', sans-serif; }
-    p, div, span, label, small, li, td, th { color: #ffffff !important; }
+    p, div, span, label, small, li, td, th { color: #e6edf3 !important; }
     .stCaption, [data-testid="stCaptionContainer"] p,
-    [data-testid="stCaptionContainer"] { color: #bbbbbb !important; }
-    [data-testid="stMetricValue"], [data-testid="stMetricLabel"] { color: #ffffff !important; }
-    [data-testid="stMarkdownContainer"] p { color: #ffffff !important; }
+    [data-testid="stCaptionContainer"] { color: #8b949e !important; }
+    [data-testid="stMetricValue"] { color: #00d4ff !important; }
+    [data-testid="stMetricLabel"] { color: #8b949e !important; }
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] li { color: #e6edf3 !important; }
 
-    /* ── Inputs — dark background, no white boxes ── */
+    /* ── Inputs — dark background ── */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea,
     .stNumberInput > div > div > input {
         background-color: #1e2130 !important;
-        color: #ffffff !important;
-        border: 1px solid #444444 !important;
+        color: #e6edf3 !important;
+        border: 1px solid #444c56 !important;
         border-radius: 6px !important;
     }
+
+    /* ── Chat input box ── */
     [data-testid="stChatInput"],
     [data-testid="stChatInput"] > div,
     [data-testid="stChatInputContainer"] {
@@ -69,59 +73,130 @@ st.markdown("""
 
     /* ── Tabs ── */
     .stTabs [data-baseweb="tab-list"] { background-color: #0e1117 !important; }
-    .stTabs [data-baseweb="tab"] { color: #aaaaaa !important; background-color: #0e1117 !important; }
+    .stTabs [data-baseweb="tab"] { color: #8b949e !important; background-color: #0e1117 !important; }
     .stTabs [aria-selected="true"] { color: #00d4ff !important; border-bottom: 2px solid #00d4ff !important; }
 
     /* ── Buttons ── */
     .stButton > button {
-        background-color: #2e2e2e !important;
-        color: #ffffff !important;
+        background-color: #21262d !important;
+        color: #e6edf3 !important;
         border-radius: 8px !important;
         padding: 10px 24px !important;
         font-weight: bold !important;
-        border: 1px solid #444444 !important;
+        border: 1px solid #444c56 !important;
     }
-    .stButton > button:hover { background-color: #3d3d3d !important; border: 1px solid #555555 !important; }
+    .stButton > button:hover { background-color: #30363d !important; border-color: #58a6ff !important; color: #ffffff !important; }
     .stDownloadButton > button {
-        background-color: #2e2e2e !important;
-        color: #ffffff !important;
-        border: 1px solid #444444 !important;
+        background-color: #21262d !important;
+        color: #e6edf3 !important;
+        border: 1px solid #444c56 !important;
         border-radius: 8px !important;
     }
     .stLinkButton a, [data-testid="stLinkButton"] a {
-        background-color: #2e2e2e !important;
-        color: #ffffff !important;
+        background-color: #21262d !important;
+        color: #e6edf3 !important;
         border-radius: 8px !important;
         padding: 10px 24px !important;
         font-weight: bold !important;
-        border: 1px solid #444444 !important;
+        border: 1px solid #444c56 !important;
         text-decoration: none !important;
         display: inline-block !important;
     }
     .stLinkButton a:hover, [data-testid="stLinkButton"] a:hover {
-        background-color: #3d3d3d !important; color: #ffffff !important;
+        background-color: #30363d !important; color: #ffffff !important;
     }
 
     /* ── Sidebar ── */
     section[data-testid="stSidebar"] { background-color: #161b22 !important; border-right: 1px solid #30363d; }
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] div,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] label { color: #e6edf3 !important; }
 
-    /* ── Expanders ── */
-    .stExpander { background-color: #161b22 !important; border: 1px solid #30363d !important; border-radius: 8px !important; }
+    /* ── Expanders — header ── */
+    .stExpander { background-color: #161b22 !important; border: 1px solid #30363d !important; border-radius: 8px !important; overflow: hidden !important; }
     .stExpander summary, details summary span, .stExpander summary p {
-        color: #111111 !important;
-        background-color: #d0d0d0 !important;
+        color: #e6edf3 !important;
+        background-color: #21262d !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+    }
+    /* ── Expanders — scrollable body ── */
+    [data-testid="stExpanderDetails"] {
+        background-color: #0d1117 !important;
+        max-height: 520px !important;
+        overflow-y: auto !important;
+        padding: 14px 18px !important;
+        border-top: 1px solid #30363d !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: #444c56 #0d1117 !important;
+    }
+    [data-testid="stExpanderDetails"]::-webkit-scrollbar { width: 8px; }
+    [data-testid="stExpanderDetails"]::-webkit-scrollbar-track { background: #0d1117; border-radius: 4px; }
+    [data-testid="stExpanderDetails"]::-webkit-scrollbar-thumb { background-color: #444c56; border-radius: 4px; }
+    [data-testid="stExpanderDetails"] p,
+    [data-testid="stExpanderDetails"] li,
+    [data-testid="stExpanderDetails"] span,
+    [data-testid="stExpanderDetails"] div { color: #e6edf3 !important; line-height: 1.65 !important; }
+    [data-testid="stExpanderDetails"] h1,
+    [data-testid="stExpanderDetails"] h2,
+    [data-testid="stExpanderDetails"] h3,
+    [data-testid="stExpanderDetails"] h4 { color: #79c0ff !important; }
+    [data-testid="stExpanderDetails"] code {
+        background-color: #1f2937 !important;
+        color: #a5f3fc !important;
+        border-radius: 4px !important;
+        padding: 2px 5px !important;
+        font-size: 0.88em !important;
+    }
+    [data-testid="stExpanderDetails"] strong { color: #f0f6fc !important; }
+
+    /* ── Code blocks (st.code) ── */
+    .stCodeBlock, [data-testid="stCode"] {
+        background-color: #161b22 !important;
+        border: 1px solid #30363d !important;
         border-radius: 6px !important;
     }
+    .stCodeBlock pre, [data-testid="stCode"] pre,
+    .stCodeBlock code, [data-testid="stCode"] code { color: #e6edf3 !important; }
 
-    /* ── Chat messages ── */
-    [data-testid="stChatMessage"] { background-color: #161b22 !important; border: 1px solid #30363d !important; border-radius: 8px !important; }
+    /* ── Chat messages — scrollable ── */
+    [data-testid="stChatMessage"] {
+        background-color: #161b22 !important;
+        border: 1px solid #30363d !important;
+        border-radius: 8px !important;
+        max-height: 600px !important;
+        overflow-y: auto !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: #444c56 #161b22 !important;
+    }
+    [data-testid="stChatMessage"]::-webkit-scrollbar { width: 8px; }
+    [data-testid="stChatMessage"]::-webkit-scrollbar-track { background: #161b22; border-radius: 4px; }
+    [data-testid="stChatMessage"]::-webkit-scrollbar-thumb { background-color: #444c56; border-radius: 4px; }
+    [data-testid="stChatMessage"] p,
+    [data-testid="stChatMessage"] li,
+    [data-testid="stChatMessage"] div { color: #e6edf3 !important; }
 
-    /* ── Status / alerts ── */
-    [data-testid="stStatus"] { background-color: #1e2130 !important; border: 1px solid #30363d !important; }
-    [data-testid="stAlert"] { background-color: #1e2130 !important; }
+    /* ── Status boxes ── */
+    [data-testid="stStatus"] { background-color: #1e2130 !important; border: 1px solid #30363d !important; border-radius: 6px !important; }
+    [data-testid="stStatus"] p, [data-testid="stStatus"] span,
+    [data-testid="stStatus"] div { color: #e6edf3 !important; }
+
+    /* ── Alert / success / error / warning / info ── */
+    [data-testid="stAlert"] { border-radius: 6px !important; }
+    [data-testid="stAlert"] p, [data-testid="stAlert"] span,
+    [data-testid="stAlert"] div { color: #e6edf3 !important; }
+    div[data-baseweb="notification"][kind="positive"],
+    .stSuccess > div { background-color: #0a2a18 !important; border-left: 4px solid #22c55e !important; }
+    div[data-baseweb="notification"][kind="negative"],
+    .stError > div { background-color: #2a0d0d !important; border-left: 4px solid #ef4444 !important; }
+    div[data-baseweb="notification"][kind="warning"],
+    .stWarning > div { background-color: #2a1c00 !important; border-left: 4px solid #f59e0b !important; }
+    div[data-baseweb="notification"][kind="info"],
+    .stInfo > div { background-color: #0a1a2a !important; border-left: 4px solid #3b82f6 !important; }
 
     /* ── Selectbox / dropdown ── */
-    [data-testid="stSelectbox"] > div > div { background-color: #1e2130 !important; color: #ffffff !important; border: 1px solid #444444 !important; }
+    [data-testid="stSelectbox"] > div > div { background-color: #1e2130 !important; color: #e6edf3 !important; border: 1px solid #444c56 !important; }
 
     /* ── Divider ── */
     hr { border-color: #30363d !important; }
