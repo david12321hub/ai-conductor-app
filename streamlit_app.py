@@ -205,23 +205,39 @@ st.markdown("""
 
     /* ── Selectbox / dropdown — white box, black text ── */
     [data-testid="stSelectbox"] > div > div,
-    [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    [data-baseweb="select"],
+    [data-baseweb="select"] > div {
         background-color: #ffffff !important;
-        color: #1a1a1a !important;
+        color: #000000 !important;
         border: 1px solid #cccccc !important;
     }
-    [data-testid="stSelectbox"] svg { fill: #1a1a1a !important; }
+    [data-testid="stSelectbox"] span,
+    [data-testid="stSelectbox"] div,
+    [data-testid="stSelectbox"] p,
+    [data-baseweb="select"] span,
+    [data-baseweb="select"] div {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    [data-testid="stSelectbox"] svg,
+    [data-baseweb="select"] svg { fill: #000000 !important; color: #000000 !important; }
+    [data-baseweb="popover"],
     [data-baseweb="popover"] ul,
     [data-baseweb="popover"] [data-baseweb="menu"] {
         background-color: #ffffff !important;
     }
-    [data-baseweb="option"] {
+    [data-baseweb="option"],
+    [data-baseweb="option"] span,
+    [data-baseweb="option"] div {
         background-color: #ffffff !important;
-        color: #1a1a1a !important;
+        color: #000000 !important;
     }
-    [data-baseweb="option"]:hover {
-        background-color: #f0f4f8 !important;
-        color: #1a1a1a !important;
+    [data-baseweb="option"]:hover,
+    [data-baseweb="option"]:hover span,
+    [data-baseweb="option"]:hover div {
+        background-color: #e8e8e8 !important;
+        color: #000000 !important;
     }
 
     /* ── Divider ── */
