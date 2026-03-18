@@ -31,21 +31,38 @@ st.markdown("""
         border: 1px solid #444444 !important;
         border-radius: 6px !important;
     }
-    [data-testid="stChatInput"] {
-        background-color: #90EE90 !important;
-        padding: 8px !important;
-        border-radius: 10px !important;
-    }
+    [data-testid="stChatInput"],
     [data-testid="stChatInput"] > div,
     [data-testid="stChatInputContainer"] {
-        background-color: #90EE90 !important;
+        background-color: #1a4731 !important;
+        padding: 8px !important;
+        border-radius: 10px !important;
+        border: none !important;
     }
     [data-testid="stChatInput"] textarea,
     .stChatInput textarea {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #aaaaaa !important;
+        background-color: #1a4731 !important;
+        color: #ffffff !important;
+        border: none !important;
         border-radius: 6px !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stChatInput"] textarea:focus,
+    [data-testid="stChatInput"] textarea:focus-visible {
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stChatInput"] button svg,
+    [data-testid="stChatInputContainer"] button svg {
+        fill: #ffffff !important;
+        color: #ffffff !important;
+    }
+    [data-testid="stChatInput"] button,
+    [data-testid="stChatInputContainer"] button {
+        background-color: transparent !important;
+        border: none !important;
     }
 
     /* ── Tabs ── */
