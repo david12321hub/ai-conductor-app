@@ -1,0 +1,61 @@
+def show_plans():
+    st.header("Choose Your Plan")
+    st.caption("Unlimited access or top up credits anytime")
+
+    col1, col2, col3 = st.columns(3)
+
+    # Pro Unlimited
+    with col1:
+        st.subheader("Pro Unlimited")
+        st.write("$49/month")
+        st.caption("Unlimited light use + 10K tokens/day")
+        if st.button("Choose Pro Unlimited", key="pro_unlimited"):
+            try:
+                session = stripe.checkout.Session.create(
+                    payment_method_types=['card'],
+                    line_items=[{'price': 'price_1TBMROFC68YihsMHDom1cias', 'quantity': 1}],
+                    mode='subscription',
+                    success_url='https://aiconductorapp.com/success',
+                    cancel_url='https://aiconductorapp.com/cancel',
+                )
+                st.markdown(f"[Pay Now →]({session.url})")
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+
+    # Enterprise Unlimited
+    with col2:
+        st.subheader("Enterprise Unlimited")
+        st.write("$149/month")
+        st.caption("50K tokens/day + priority support")
+        if st.button("Choose Enterprise", key="enterprise_unlimited"):
+            try:
+                session = stripe.checkout.Session.create(
+                    payment_method_types=['card'],
+                    line_items=[{'price': 'price_1TBMRKFC68YihsMHgZofMvjO', 'quantity': 1}],
+                    mode='subscription',
+                    success_url='https://aiconductorapp.com/success',
+                    cancel_url='https://aiconductorapp.com/cancel',
+                )
+                st.markdown(f"[Pay Now →]({session.url})")
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+
+    # Pay-as-you-go
+    with col3:
+        st.subheader("Pay-as-you-go")
+        st.write("Top up credits")
+        amounts = [5, 10, 15, 20]
+        selected = st.selectbox("Select amount ($)", amounts, key="payg_amount")
+        if st.button(f"Buy ${selected} Credits", key="payg_buy"):
+            try:
+                # REPLACE with your actual Pay-as-you-go Price ID from Stripe
+                session = stripe.checkout.Session.create(
+                    payment_method_types=['card'],
+                    line_items=[{'price': 'price_YourPayAsYouGoPriceIDHere', 'quantity': 1}],
+                    mode='payment',
+                    success_url='https://aiconductorapp.com/success',
+                    cancel_url='https://aiconductorapp.com/cancel',
+                )
+                st.markdown(f"[Pay Now →]({session.url})")
+            except Exception as e:
+                st.error(f"Payment error: {str(e)}")

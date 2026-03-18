@@ -129,7 +129,6 @@ AUTH_HEADERS = {
 }
 
 # ==================== Stripe Price IDs ====================
-STRIPE_BASIC_PRICE_ID        = "price_1TBMRNFC68YihsMHbAOq7jGj"  # $9/mo  — Basic
 STRIPE_PRO_PRICE_ID          = "price_1TBMROFC68YihsMHDom1cias"   # $49/mo — Pro Unlimited
 STRIPE_ENTERPRISE_PRICE_ID   = "price_1TBMRKFC68YihsMHgZofMvjO"   # $149/mo — Enterprise Unlimited
 
@@ -354,22 +353,9 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
         st.caption("You'll be taken to Stripe's hosted checkout. Return here after payment.")
         st.stop()
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown("### Basic")
-        st.markdown("$9 / month")
-        st.markdown("- 500 queries / month\n- All 4 AI models\n- Basic agents\n- Download results\n- Cancel anytime")
-        if st.button("Choose Basic — $9/mo", use_container_width=True, key="buy_basic"):
-            with st.spinner("Creating checkout..."):
-                try:
-                    url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
-                    st.session_state.checkout_url = url
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Payment setup error: {str(e)}")
-
-    with col2:
         st.markdown("### Pro Unlimited")
         st.markdown("$49 / month")
         st.markdown("- Unlimited light use\n- 10K tokens/day\n- All 4 AI models\n- Custom agents\n- Priority processing\n- Cancel anytime")
@@ -382,7 +368,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
                 except Exception as e:
                     st.error(f"Payment setup error: {str(e)}")
 
-    with col3:
+    with col2:
         st.markdown("### Enterprise Unlimited")
         st.markdown("$149 / month")
         st.markdown("- 50K tokens/day\n- Priority processing\n- API access\n- Dedicated support\n- Custom integrations\n- SLA guarantee")
@@ -395,7 +381,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
                 except Exception as e:
                     st.error(f"Payment setup error: {str(e)}")
 
-    with col4:
+    with col3:
         st.markdown("### Pay-as-you-go")
         st.markdown("One-time credit pack")
         st.markdown("- $5 → 100 credits\n- $10 → 250 credits\n- $15 → 400 credits\n- $20 → 600 credits")
@@ -418,7 +404,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 # ==================== Plans (main area) ====================
 def show_plans(user_email: str, user_id: str):
     st.subheader("Choose Your Plan")
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4 = st.columns(4)
 
     with c1:
         st.markdown("Free Trial")
@@ -431,18 +417,6 @@ def show_plans(user_email: str, user_id: str):
                 st.warning("Already used — upgrade to continue.")
 
     with c2:
-        st.markdown("Basic")
-        st.caption("$9/mo · 500 queries")
-        if st.button("Choose Basic", key="plan_basic", use_container_width=True):
-            try:
-                url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
-                st.session_state.checkout_url = url
-                st.session_state.page = "upgrade"
-                st.rerun()
-            except Exception as e:
-                st.error(str(e))
-
-    with c3:
         st.markdown("Pro Unlimited")
         st.caption("$49/mo · 10K tokens/day")
         if st.button("Choose Pro", key="plan_pro", use_container_width=True):
@@ -454,7 +428,7 @@ def show_plans(user_email: str, user_id: str):
             except Exception as e:
                 st.error(str(e))
 
-    with c4:
+    with c3:
         st.markdown("Enterprise Unlimited")
         st.caption("$149/mo · 50K tokens/day")
         if st.button("Choose Enterprise", key="plan_ent", use_container_width=True):
@@ -466,7 +440,7 @@ def show_plans(user_email: str, user_id: str):
             except Exception as e:
                 st.error(str(e))
 
-    with c5:
+    with c4:
         st.markdown("Pay-as-you-go")
         st.caption("One-time credit pack")
         payg_amt = st.selectbox("Amount ($)", [5, 10, 15, 20], key="payg_amt_plans")
@@ -582,19 +556,8 @@ if st.session_state.user:
                 else:
                     st.warning("You've already used your free trial. Upgrade to continue!")
 
-        sc1, sc2, sc3 = st.columns(3)
+        sc1, sc2 = st.columns(2)
         with sc1:
-            st.markdown("Basic")
-            st.caption("$9/mo")
-            if st.button("Choose", key="sb_basic", use_container_width=True):
-                try:
-                    url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
-                    st.session_state.checkout_url = url
-                    st.session_state.page = "upgrade"
-                    st.rerun()
-                except Exception as e:
-                    st.error(str(e))
-        with sc2:
             st.markdown("Pro Unlimited")
             st.caption("$49/mo")
             if st.button("Choose", key="sb_pro", use_container_width=True):
@@ -605,7 +568,7 @@ if st.session_state.user:
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))
-        with sc3:
+        with sc2:
             st.markdown("Enterprise")
             st.caption("$149/mo")
             if st.button("Choose", key="sb_ent", use_container_width=True):
@@ -657,17 +620,8 @@ if st.session_state.user:
 
     if balance <= 0:
         st.error("You're out of credits. Choose a plan below to continue.")
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
-            if st.button("Basic — $9/mo", use_container_width=True):
-                try:
-                    url = create_stripe_session(STRIPE_BASIC_PRICE_ID, "subscription", user_email, user_id, 500)
-                    st.session_state.checkout_url = url
-                    st.session_state.page = "upgrade"
-                    st.rerun()
-                except Exception as e:
-                    st.error(str(e))
-        with col2:
             if st.button("Pro Unlimited — $49/mo", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -676,7 +630,7 @@ if st.session_state.user:
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))
-        with col3:
+        with col2:
             if st.button("Enterprise — $149/mo", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
