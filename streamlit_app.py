@@ -203,8 +203,26 @@ st.markdown("""
     div[data-baseweb="notification"][kind="info"],
     .stInfo > div { background-color: #0a1a2a !important; border-left: 4px solid #3b82f6 !important; }
 
-    /* ── Selectbox / dropdown ── */
-    [data-testid="stSelectbox"] > div > div { background-color: #1e2130 !important; color: #e6edf3 !important; border: 1px solid #444c56 !important; }
+    /* ── Selectbox / dropdown — white box, black text ── */
+    [data-testid="stSelectbox"] > div > div,
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+        border: 1px solid #cccccc !important;
+    }
+    [data-testid="stSelectbox"] svg { fill: #1a1a1a !important; }
+    [data-baseweb="popover"] ul,
+    [data-baseweb="popover"] [data-baseweb="menu"] {
+        background-color: #ffffff !important;
+    }
+    [data-baseweb="option"] {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
+    [data-baseweb="option"]:hover {
+        background-color: #f0f4f8 !important;
+        color: #1a1a1a !important;
+    }
 
     /* ── Divider ── */
     hr { border-color: #30363d !important; }
