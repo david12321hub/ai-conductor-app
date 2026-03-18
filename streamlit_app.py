@@ -149,14 +149,22 @@ st.markdown("""
     }
     [data-testid="stExpanderDetails"] strong { color: #f0f6fc !important; }
 
-    /* ── Code blocks (st.code) ── */
-    .stCodeBlock, [data-testid="stCode"] {
-        background-color: #161b22 !important;
-        border: 1px solid #30363d !important;
+    /* ── Code blocks (st.code) — white box, black text ── */
+    .stCodeBlock, [data-testid="stCode"],
+    .stCodeBlock > div, [data-testid="stCode"] > div {
+        background-color: #ffffff !important;
+        border: 1px solid #cccccc !important;
         border-radius: 6px !important;
     }
-    .stCodeBlock pre, [data-testid="stCode"] pre,
-    .stCodeBlock code, [data-testid="stCode"] code { color: #e6edf3 !important; }
+    .stCodeBlock pre, [data-testid="stCode"] pre {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
+    .stCodeBlock code, [data-testid="stCode"] code,
+    .stCodeBlock span, [data-testid="stCode"] span {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
 
     /* ── Chat messages — scrollable ── */
     [data-testid="stChatMessage"] {
