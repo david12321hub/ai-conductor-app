@@ -45,8 +45,8 @@ st.markdown("""
     }
     [data-testid="stChatInput"] textarea,
     .stChatInput textarea {
-        background-color: #1a4731 !important;
-        color: #ffffff !important;
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
         border: none !important;
         border-radius: 6px !important;
         outline: none !important;
@@ -54,6 +54,8 @@ st.markdown("""
     }
     [data-testid="stChatInput"] textarea:focus,
     [data-testid="stChatInput"] textarea:focus-visible {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
         border: none !important;
         outline: none !important;
         box-shadow: none !important;
