@@ -754,40 +754,50 @@ if st.session_state.user:
     if st.session_state.get("last_code") or st.session_state.get("last_plan"):
         st.divider()
         st.markdown("### Plan Actions")
+
+        can_execute = balance > 0 or st.session_state.get("free_trial_used", False)
+
         col_exec, col_save = st.columns(2)
 
         with col_exec:
-            if st.button("Run Code", use_container_width=True):
-                import subprocess, tempfile, sys, re
-                code = st.session_state.get("last_code", "")
-                code = re.sub(r"^```[a-z]*\n?", "", code, flags=re.MULTILINE)
-                code = re.sub(r"```$", "", code, flags=re.MULTILINE).strip()
-                with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as tmp:
-                    tmp.write(code)
-                    tmp_path = tmp.name
-                with st.spinner("Running code..."):
-                    result = subprocess.run(
-                        [sys.executable, tmp_path],
-                        capture_output=True, text=True, timeout=30
-                    )
-                if result.stdout:
-                    with st.expander("Output", expanded=True):
-                        st.code(result.stdout)
-                if result.stderr:
-                    with st.expander("Errors", expanded=True):
-                        st.code(result.stderr)
-                if not result.stdout and not result.stderr:
-                    st.success("Code ran successfully with no output.")
+            if st.button("Execute Plan", disabled=not can_execute, use_container_width=True):
+                if not can_execute:
+                    st.warning("No credits left. Buy credits or upgrade to execute plans.")
+                else:
+                    import subprocess, tempfile, sys, re
+                    code = st.session_state.get("last_code", "")
+                    code = re.sub(r"^```[a-z]*\n?", "", code, flags=re.MULTILINE)
+                    code = re.sub(r"```$", "", code, flags=re.MULTILINE).strip()
+                    with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as tmp:
+                        tmp.write(code)
+                        tmp_path = tmp.name
+                    with st.spinner("Executing..."):
+                        result = subprocess.run(
+                            [sys.executable, tmp_path],
+                            capture_output=True, text=True, timeout=30
+                        )
+                    if result.stdout:
+                        with st.expander("Output", expanded=True):
+                            st.code(result.stdout)
+                    if result.stderr:
+                        with st.expander("Errors", expanded=True):
+                            st.code(result.stderr)
+                    if not result.stdout and not result.stderr:
+                        st.success("Plan executed!")
 
         with col_save:
-            plan_text = st.session_state.get("last_plan", "")
-            st.download_button(
-                label="Save Plan",
-                data=plan_text,
-                file_name="conductor_plan.md",
-                mime="text/markdown",
-                use_container_width=True,
-            )
+            if not can_execute:
+                st.button("Save Plan", disabled=True, use_container_width=True)
+                st.caption("No credits left. Buy credits or upgrade to save plans.")
+            else:
+                plan_text = st.session_state.get("last_plan", "")
+                st.download_button(
+                    label="Save Plan",
+                    data=plan_text,
+                    file_name="conductor_plan.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
 
 else:
     show_auth()
