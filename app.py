@@ -261,6 +261,27 @@ st.markdown("""
         color: #000000 !important;
     }
 
+    /* ── Plan Action Buttons ── */
+    .plan-exec-marker { display: none; }
+    div:has(.plan-exec-marker) + div [data-testid="stColumn"]:nth-child(1) .stButton > button {
+        background-color: #dc2626 !important;
+        border-color: #b91c1c !important;
+        color: #ffffff !important;
+    }
+    div:has(.plan-exec-marker) + div [data-testid="stColumn"]:nth-child(1) .stButton > button:hover {
+        background-color: #b91c1c !important;
+    }
+    div:has(.plan-exec-marker) + div [data-testid="stColumn"]:nth-child(2) .stButton > button,
+    div:has(.plan-exec-marker) + div [data-testid="stColumn"]:nth-child(2) .stDownloadButton > button {
+        background-color: #16a34a !important;
+        border-color: #15803d !important;
+        color: #ffffff !important;
+    }
+    div:has(.plan-exec-marker) + div [data-testid="stColumn"]:nth-child(2) .stButton > button:hover,
+    div:has(.plan-exec-marker) + div [data-testid="stColumn"]:nth-child(2) .stDownloadButton > button:hover {
+        background-color: #15803d !important;
+    }
+
     /* ── Divider ── */
     hr { border-color: #30363d !important; }
     </style>
@@ -905,6 +926,7 @@ if st.session_state.user:
 
         can_execute = balance > 0 or st.session_state.get("free_trial_used", False)
 
+        st.markdown('<span class="plan-exec-marker"></span>', unsafe_allow_html=True)
         col_exec, col_save = st.columns(2)
 
         with col_exec:
