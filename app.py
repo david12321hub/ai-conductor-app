@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 import requests
 import os
+import concurrent.futures
 from pathlib import Path
 
 st.set_page_config(page_title="AI Conductor", page_icon="", layout="centered")
@@ -658,7 +659,7 @@ def ask_cohere(prompt: str) -> str:
         "https://api.cohere.com/v2/chat",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json={"model": "command-r-plus-08-2024", "messages": [{"role": "user", "content": prompt}]},
-        timeout=30,
+        timeout=15,
     )
     r.raise_for_status()
     return r.json()["message"]["content"][0]["text"]
@@ -671,7 +672,7 @@ def ask_mistral(prompt: str) -> str:
         "https://api.mistral.ai/v1/chat/completions",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json={"model": "mistral-large-latest", "messages": [{"role": "user", "content": prompt}]},
-        timeout=30,
+        timeout=15,
     )
     r.raise_for_status()
     return r.json()["choices"][0]["message"]["content"]
@@ -839,32 +840,65 @@ if st.session_state.user:
 
         with st.chat_message("assistant"):
             try:
-                claude = get_claude(temperature=0.3)
                 synthesizer = get_claude(temperature=0.2)
 
-                s1 = st.status(" Asking Claude...", expanded=False)
-                with s1:
-                    raw_claude = claude.invoke(prompt).content
-                    s1.update(label="✅ Claude answered")
+                # Run all 4 AIs in parallel so total wait = slowest single model
+                def _call_claude():
+                    return get_claude(temperature=0.3).invoke(prompt).content
 
-                s2 = st.status(" Asking Gemini...", expanded=False)
-                with s2:
-                    raw_gemini, gemini_ok = call_ai_safely("Gemini", ask_gemini, prompt, s2)
+                with st.spinner("Asking Claude, Gemini, Cohere & Mistral simultaneously…"):
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+                        f_claude  = ex.submit(_call_claude)
+                        f_gemini  = ex.submit(ask_gemini,  prompt)
+                        f_cohere  = ex.submit(ask_cohere,  prompt)
+                        f_mistral = ex.submit(ask_mistral, prompt)
 
-                s3 = st.status(" Asking Cohere...", expanded=False)
-                with s3:
-                    raw_cohere, cohere_ok = call_ai_safely("Cohere", ask_cohere, prompt, s3)
+                # Collect results and show individual status boxes
+                try:
+                    raw_claude = f_claude.result()
+                    st.success("✅ Claude answered")
+                except Exception as e:
+                    raw_claude = ""
+                    st.warning(f"⚠️ Claude skipped — {str(e)[:80]}")
 
-                s4 = st.status(" Asking Mistral...", expanded=False)
-                with s4:
-                    raw_mistral, mistral_ok = call_ai_safely("Mistral", ask_mistral, prompt, s4)
+                try:
+                    raw_gemini = f_gemini.result()
+                    gemini_ok = True
+                    st.success("✅ Gemini answered")
+                except Exception as e:
+                    raw_gemini = ""
+                    gemini_ok = False
+                    st.warning(f"⚠️ Gemini skipped — {str(e)[:80]}")
+
+                try:
+                    raw_cohere = f_cohere.result()
+                    cohere_ok = True
+                    st.success("✅ Cohere answered")
+                except Exception as e:
+                    raw_cohere = ""
+                    cohere_ok = False
+                    st.warning(f"⚠️ Cohere skipped — {str(e)[:80]}")
+
+                try:
+                    raw_mistral = f_mistral.result()
+                    mistral_ok = True
+                    st.success("✅ Mistral answered")
+                except Exception as e:
+                    raw_mistral = ""
+                    mistral_ok = False
+                    st.warning(f"⚠️ Mistral skipped — {str(e)[:80]}")
 
                 s5 = st.status(" Synthesizing plan from all AIs...", expanded=False)
                 with s5:
-                    responses = [f"Claude:\n{raw_claude}"]
-                    if gemini_ok: responses.append(f"Gemini:\n{raw_gemini}")
-                    if cohere_ok: responses.append(f"Cohere:\n{raw_cohere}")
+                    responses = []
+                    if raw_claude: responses.append(f"Claude:\n{raw_claude}")
+                    if gemini_ok:  responses.append(f"Gemini:\n{raw_gemini}")
+                    if cohere_ok:  responses.append(f"Cohere:\n{raw_cohere}")
                     if mistral_ok: responses.append(f"Mistral:\n{raw_mistral}")
+                    if not responses:
+                        s5.update(label="❌ All AIs failed — cannot synthesize")
+                        st.error("All AI models failed to respond. Please try again.")
+                        st.stop()
                     ai_count = len(responses)
                     plan = synthesizer.invoke([
                         SystemMessage(content=(
