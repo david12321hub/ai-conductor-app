@@ -232,18 +232,29 @@ st.markdown("""
     /* ── Selectbox open dropdown — white background, black text ── */
     [data-baseweb="popover"],
     [data-baseweb="popover"] ul,
-    [data-baseweb="popover"] [data-baseweb="menu"] {
+    [data-baseweb="popover"] [data-baseweb="menu"],
+    ul[role="listbox"],
+    li[role="option"] {
         background-color: #ffffff !important;
     }
     [data-baseweb="option"],
-    [data-baseweb="option"] span,
-    [data-baseweb="option"] div {
+    li[role="option"],
+    ul[role="listbox"] li {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    [data-baseweb="option"] *,
+    li[role="option"] *,
+    ul[role="listbox"] li * {
         background-color: #ffffff !important;
         color: #000000 !important;
     }
     [data-baseweb="option"]:hover,
-    [data-baseweb="option"]:hover span,
-    [data-baseweb="option"]:hover div {
+    li[role="option"]:hover {
+        background-color: #e8e8e8 !important;
+    }
+    [data-baseweb="option"]:hover *,
+    li[role="option"]:hover * {
         background-color: #e8e8e8 !important;
         color: #000000 !important;
     }
