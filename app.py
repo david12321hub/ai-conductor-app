@@ -284,8 +284,8 @@ AUTH_HEADERS = {
 }
 
 # ==================== Stripe Price IDs ====================
-STRIPE_PRO_PRICE_ID          = "price_1TCRYTFC68YihsMHeQmcuabi"   # $49/mo — Pro Unlimited
-STRIPE_ENTERPRISE_PRICE_ID   = "price_1TCRVKFC68YihsMHX5dYRXcJ"   # $149/mo — Enterprise Unlimited
+STRIPE_PRO_PRICE_ID          = "price_1TCRYTFC68YihsMHeQmcuabi"   # $10/mo — Pro Unlimited
+STRIPE_ENTERPRISE_PRICE_ID   = "price_1TCRVKFC68YihsMHX5dYRXcJ"   # $25/mo — Enterprise Unlimited
 
 PAYG_CREDITS = {5: 100, 10: 250, 15: 400, 20: 600}  # dollars → credits granted
 
@@ -512,9 +512,9 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 
     with col1:
         st.markdown("### Pro Unlimited")
-        st.markdown("$49 / month")
+        st.markdown("$10 / month")
         st.markdown("- Unlimited light use\n- 10K tokens/day\n- All 4 AI models\n- Custom agents\n- Priority processing\n- Cancel anytime")
-        if st.button("Choose Pro Unlimited — $49/mo", use_container_width=True, key="buy_pro"):
+        if st.button("Choose Pro Unlimited — $10/mo", use_container_width=True, key="buy_pro"):
             with st.spinner("Creating checkout..."):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -525,9 +525,9 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 
     with col2:
         st.markdown("### Enterprise Unlimited")
-        st.markdown("$149 / month")
+        st.markdown("$25 / month")
         st.markdown("- 50K tokens/day\n- Priority processing\n- API access\n- Dedicated support\n- Custom integrations\n- SLA guarantee")
-        if st.button("Choose Enterprise — $149/mo", use_container_width=True, key="buy_enterprise"):
+        if st.button("Choose Enterprise — $25/mo", use_container_width=True, key="buy_enterprise"):
             with st.spinner("Creating checkout..."):
                 try:
                     url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -573,7 +573,7 @@ def show_plans(user_email: str, user_id: str):
 
     with c2:
         st.markdown("Pro Unlimited")
-        st.caption("$49/mo · 10K tokens/day")
+        st.caption("$10/mo · 10K tokens/day")
         if st.button("Choose Pro", key="plan_pro", use_container_width=True):
             try:
                 url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -585,7 +585,7 @@ def show_plans(user_email: str, user_id: str):
 
     with c3:
         st.markdown("Enterprise Unlimited")
-        st.caption("$149/mo · 50K tokens/day")
+        st.caption("$25/mo · 50K tokens/day")
         if st.button("Choose Enterprise", key="plan_ent", use_container_width=True):
             try:
                 url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -723,7 +723,7 @@ if st.session_state.user:
         sc1, sc2 = st.columns(2)
         with sc1:
             st.markdown("Pro Unlimited")
-            st.caption("$49/mo")
+            st.caption("$10/mo")
             if st.button("Choose", key="sb_pro", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -734,7 +734,7 @@ if st.session_state.user:
                     st.error(str(e))
         with sc2:
             st.markdown("Enterprise")
-            st.caption("$149/mo")
+            st.caption("$25/mo")
             if st.button("Choose", key="sb_ent", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
@@ -786,7 +786,7 @@ if st.session_state.user:
         st.error("You're out of credits. Choose a plan below to continue.")
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Pro Unlimited — $49/mo", use_container_width=True):
+            if st.button("Pro Unlimited — $10/mo", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_PRO_PRICE_ID, "subscription", user_email, user_id, 9999)
                     st.session_state.checkout_url = url
@@ -795,7 +795,7 @@ if st.session_state.user:
                 except Exception as e:
                     st.error(str(e))
         with col2:
-            if st.button("Enterprise — $149/mo", use_container_width=True):
+            if st.button("Enterprise — $25/mo", use_container_width=True):
                 try:
                     url = create_stripe_session(STRIPE_ENTERPRISE_PRICE_ID, "subscription", user_email, user_id, 9999)
                     st.session_state.checkout_url = url
