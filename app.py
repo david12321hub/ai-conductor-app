@@ -287,13 +287,6 @@ AUTH_HEADERS = {
 STRIPE_PRO_PRICE_ID          = "price_1TCRYTFC68YihsMHeQmcuabi"   # $49/mo — Pro Unlimited
 STRIPE_ENTERPRISE_PRICE_ID   = "price_1TCRVKFC68YihsMHX5dYRXcJ"   # $149/mo — Enterprise Unlimited
 
-# Pay-as-you-go: per-amount Price IDs and credit grants
-PAYG_PRICE_IDS = {
-    5:  "price_1TCRWnFC68YihsMHNsgK5Uld",
-    10: "price_1TCRYTFC68YihsMHeQmcuabi",
-    15: "price_1TCRZ6FC68YihsMHStTerTSD",
-    20: "price_1TCRaNFC68YihsMH19Smqd3P",
-}
 PAYG_CREDITS = {5: 100, 10: 250, 15: 400, 20: 600}  # dollars → credits granted
 
 # ==================== Session State ====================
@@ -422,9 +415,6 @@ def create_stripe_session(price_id: str, mode: str, user_email: str, user_id: st
     return r.json()["url"]
 
 def create_stripe_payg_session(amount_dollars: int, user_email: str, user_id: str) -> str:
-    price_id = PAYG_PRICE_IDS.get(amount_dollars)
-    if not price_id:
-        raise ValueError(f"No price configured for ${amount_dollars}")
     credits_grant = PAYG_CREDITS.get(amount_dollars, amount_dollars * 20)
     base_url = get_base_url()
     key = _stripe_key()
@@ -433,7 +423,10 @@ def create_stripe_payg_session(amount_dollars: int, user_email: str, user_id: st
         f"&credits={credits_grant}&mode=payment&amount={amount_dollars}"
     )
     fields = [
-        ("line_items[0][price]", price_id),
+        ("line_items[0][price_data][currency]", "usd"),
+        ("line_items[0][price_data][unit_amount]", str(amount_dollars * 100)),
+        ("line_items[0][price_data][product_data][name]",
+         f"AI Conductor Credits — ${amount_dollars} ({credits_grant} credits)"),
         ("line_items[0][quantity]", "1"),
         ("mode", "payment"),
         ("success_url", success_url),
