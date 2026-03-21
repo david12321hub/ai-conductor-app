@@ -19,7 +19,7 @@ st.markdown("""
     /* ── Text ── */
     h1, h2, h3, h4, h5, h6 { color: #00d4ff !important; font-family: 'Helvetica Neue', sans-serif; }
     p, div, span, label, small, li, td, th { color: #e6edf3 !important; }
-    span.sidebar-email { color: #00d4ff !important; }
+    section[data-testid="stSidebar"] span.sidebar-email { color: #00d4ff !important; }
     .stCaption, [data-testid="stCaptionContainer"] p,
     [data-testid="stCaptionContainer"] { color: #8b949e !important; }
     [data-testid="stMetricValue"] { color: #00d4ff !important; }
