@@ -19,6 +19,7 @@ st.markdown("""
     /* ── Text ── */
     h1, h2, h3, h4, h5, h6 { color: #00d4ff !important; font-family: 'Helvetica Neue', sans-serif; }
     p, div, span, label, small, li, td, th { color: #e6edf3 !important; }
+    span.sidebar-email { color: #00d4ff !important; }
     .stCaption, [data-testid="stCaptionContainer"] p,
     [data-testid="stCaptionContainer"] { color: #8b949e !important; }
     [data-testid="stMetricValue"] { color: #00d4ff !important; }
@@ -856,7 +857,7 @@ if st.session_state.user:
         st.image("conductor_logo.jpg", width=90)
         st.markdown(
             f'<p style="color:#8b949e;font-size:0.875rem;margin:0">Signed in as '
-            f'<span style="color:#00d4ff">{user_email}</span></p>',
+            f'<span class="sidebar-email">{user_email}</span></p>',
             unsafe_allow_html=True,
         )
         st.divider()
