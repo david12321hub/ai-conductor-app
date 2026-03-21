@@ -307,6 +307,8 @@ DB_HEADERS = {
 STRIPE_PRO_PRICE_ID          = "price_1TCRYTFC68YihsMHeQmcuabi"   # $10/mo — Pro Unlimited
 STRIPE_ENTERPRISE_PRICE_ID   = "price_1TCRVKFC68YihsMHX5dYRXcJ"   # $25/mo — Enterprise Unlimited
 
+OWNER_EMAIL = "david_darling12321@yahoo.co.uk"
+
 PAYG_CREDITS = {5: 100, 10: 250, 15: 400, 20: 600}  # dollars → credits granted
 
 # ==================== Auth Helpers ====================
@@ -451,6 +453,47 @@ def check_token_cap(user_id: str, balance: int) -> bool:
         )
         st.stop()
     return True
+
+# ==================== Transaction Tracking ====================
+# Requires a Supabase table:
+#   CREATE TABLE transactions (
+#     id            bigserial PRIMARY KEY,
+#     user_id       text      NOT NULL,
+#     user_email    text,
+#     tier          text,
+#     amount_paid   numeric   NOT NULL DEFAULT 0,
+#     amount_profit numeric   NOT NULL DEFAULT 0,
+#     created_at    timestamptz DEFAULT now()
+#   );
+
+def record_transaction(user_id: str, user_email: str, tier: str,
+                       amount_paid: float, amount_profit: float):
+    try:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/transactions",
+            headers=DB_HEADERS,
+            json={
+                "user_id": user_id,
+                "user_email": user_email,
+                "tier": tier,
+                "amount_paid": round(amount_paid, 2),
+                "amount_profit": round(amount_profit, 2),
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+def fetch_transactions() -> list:
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/transactions?select=*&order=created_at.desc",
+            headers=DB_HEADERS, timeout=10,
+        )
+        data = r.json()
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
 
 # ==================== Stripe Helpers ====================
 def get_base_url() -> str:
@@ -785,16 +828,21 @@ if st.session_state.user:
             st.session_state.checkout_url = None
             st.query_params.clear()
             if credits_to_add >= 9999:
+                tier = "subscription"
+                record_transaction(user_id, user_email, tier, 0, 0)
                 st.success("Payment successful! Your subscription is now active — unlimited queries unlocked.")
             elif paid_amount > 0:
                 credit_value = paid_amount * 0.5
                 profit = paid_amount * 0.5
+                tier = "payg"
+                record_transaction(user_id, user_email, tier, paid_amount, profit)
                 st.success(
                     f"Payment successful! ${credit_value:.2f} in credits added to your account "
                     f"({credits_to_add} queries). Profit retained: ${profit:.2f}. "
                     f"New balance: {balance} credits."
                 )
             else:
+                record_transaction(user_id, user_email, "other", 0, 0)
                 st.success(f"Payment successful! {credits_to_add} credits added. Balance: {balance}")
         elif session_id:
             st.query_params.clear()
@@ -873,6 +921,40 @@ if st.session_state.user:
             st.session_state.messages = []
             st.session_state.page = "chat"
             st.rerun()
+
+        # ---- Owner Dashboard ----
+        if user_email == OWNER_EMAIL:
+            st.divider()
+            with st.expander("Owner Dashboard — Profit Tracking", expanded=False):
+                st.subheader("Revenue & Profit per User")
+                txns = fetch_transactions()
+                if txns:
+                    total_revenue = sum(t.get("amount_paid", 0) for t in txns)
+                    total_profit  = sum(t.get("amount_profit", 0) for t in txns)
+                    c1, c2 = st.columns(2)
+                    c1.metric("Total Revenue", f"${total_revenue:,.2f}")
+                    c2.metric("Total Profit (50%)", f"${total_profit:,.2f}")
+                    st.divider()
+                    st.markdown("**Per-user breakdown**")
+                    user_map: dict = {}
+                    for t in txns:
+                        uid   = t.get("user_id", "unknown")
+                        email = t.get("user_email") or uid[:8] + "…"
+                        if uid not in user_map:
+                            user_map[uid] = {"email": email, "revenue": 0.0, "profit": 0.0, "txns": 0}
+                        user_map[uid]["revenue"] += t.get("amount_paid", 0)
+                        user_map[uid]["profit"]  += t.get("amount_profit", 0)
+                        user_map[uid]["txns"]    += 1
+                    for uid, row in sorted(user_map.items(),
+                                           key=lambda x: x[1]["profit"], reverse=True):
+                        st.markdown(
+                            f"**{row['email']}** — "
+                            f"Revenue: ${row['revenue']:.2f} · "
+                            f"Profit: **${row['profit']:.2f}** · "
+                            f"{row['txns']} transaction(s)"
+                        )
+                else:
+                    st.info("No transactions recorded yet.")
 
     if st.session_state.page == "upgrade":
         show_upgrade(user_email, user_id, balance)
