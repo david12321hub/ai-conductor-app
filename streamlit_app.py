@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import concurrent.futures
+import datetime
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 from google import genai
@@ -380,6 +381,76 @@ def add_credits(user_id: str, current_balance: int, amount: int) -> int:
     new_balance = 9999 if amount >= 9999 else min(9999, current_balance + amount)
     set_credits(user_id, new_balance)
     return new_balance
+
+# ==================== Daily Token Cap ====================
+# Requires a Supabase table:
+#   CREATE TABLE user_usage (
+#     user_id text NOT NULL,
+#     date    text NOT NULL,
+#     tokens_used int NOT NULL DEFAULT 0,
+#     PRIMARY KEY (user_id, date)
+#   );
+DAILY_TOKEN_CAP = {
+    "free_trial":             5_000,
+    "payg":                  10_000,
+    "pro_unlimited":         100_000,
+    "enterprise_unlimited":  500_000,
+}
+
+def get_user_tier(balance: int) -> str:
+    if balance >= 9999:
+        return "pro_unlimited"
+    if balance >= 11:
+        return "payg"
+    return "free_trial"
+
+def get_daily_tokens_used(user_id: str) -> int:
+    try:
+        today = datetime.date.today().isoformat()
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/user_usage?user_id=eq.{user_id}&date=eq.{today}&select=tokens_used",
+            headers=DB_HEADERS, timeout=5,
+        )
+        data = r.json()
+        if isinstance(data, list) and data:
+            return data[0].get("tokens_used", 0)
+        return 0
+    except Exception:
+        return 0
+
+def add_daily_tokens(user_id: str, tokens: int):
+    try:
+        today = datetime.date.today().isoformat()
+        current = get_daily_tokens_used(user_id)
+        new_total = current + tokens
+        r = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/user_usage?user_id=eq.{user_id}&date=eq.{today}",
+            headers={**DB_HEADERS, "Prefer": "return=representation"},
+            json={"tokens_used": new_total},
+            timeout=5,
+        )
+        if not r.ok or not r.json():
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/user_usage",
+                headers=DB_HEADERS,
+                json={"user_id": user_id, "date": today, "tokens_used": tokens},
+                timeout=5,
+            )
+    except Exception:
+        pass
+
+def check_token_cap(user_id: str, balance: int) -> bool:
+    tier = get_user_tier(balance)
+    cap = DAILY_TOKEN_CAP.get(tier, 5_000)
+    used = get_daily_tokens_used(user_id)
+    if used >= cap:
+        tier_label = tier.replace("_", " ").title()
+        st.warning(
+            f"Daily token limit reached ({used:,} / {cap:,} tokens) for your **{tier_label}** tier. "
+            "Upgrade your plan or wait until tomorrow to continue."
+        )
+        st.stop()
+    return True
 
 # ==================== Stripe Helpers ====================
 def get_base_url() -> str:
@@ -850,6 +921,7 @@ if st.session_state.user:
 
         with st.chat_message("assistant"):
             try:
+                check_token_cap(user_id, balance)
                 synthesizer = get_claude(temperature=0.2)
 
                 # Run all 4 AIs in parallel so total wait = slowest single model
@@ -921,6 +993,11 @@ if st.session_state.user:
                     s5.update(label=f"✅ Plan synthesized from {ai_count} AI response(s)")
 
                 balance = deduct_credit(user_id, balance)
+
+                # Estimate tokens from all text produced this query (~4 chars/token)
+                all_text = " ".join(responses) + plan
+                add_daily_tokens(user_id, max(1, len(all_text) // 4))
+
                 st.markdown(" Synthesized Plan:")
                 st.write(plan)
 

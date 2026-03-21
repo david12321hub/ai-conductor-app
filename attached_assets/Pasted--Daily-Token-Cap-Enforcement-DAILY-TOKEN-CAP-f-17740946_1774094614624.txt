@@ -1,0 +1,51 @@
+# ==================== Daily Token Cap Enforcement ====================
+DAILY_TOKEN_CAP = {
+    "free_trial": 5000,      # very limited for trial
+    "payg": 10000,           # per $10 purchased (adjust ratio)
+    "basic": 20000,
+    "pro_unlimited": 100000,
+    "enterprise_unlimited": 500000
+}
+
+def get_user_tier():
+    # Simple example: check credits or subscription status
+    # In real app, query Supabase for active subscription
+    if st.session_state.free_trial_used and get_user_credits() == 0:
+        return "free_trial"
+    # Add logic to detect paid tier (e.g. from Stripe webhook or Supabase)
+    return "pro_unlimited"  # placeholder — replace with real check
+
+def get_daily_tokens_used():
+    if not st.session_state.user:
+        return 0
+    user_id = st.session_state.user.id
+    today = datetime.date.today().isoformat()
+    result = supabase.table("user_usage").select("tokens_used").eq("user_id", user_id).eq("date", today).execute()
+    return result.data[0]["tokens_used"] if result.data else 0
+
+def add_tokens_used(tokens):
+    user_id = st.session_state.user.id
+    today = datetime.date.today().isoformat()
+    current = get_daily_tokens_used()
+    supabase.table("user_usage").upsert({
+        "user_id": user_id,
+        "date": today,
+        "tokens_used": current + tokens
+    }, on_conflict="user_id, date").execute()
+
+# Before every AI call (add this check)
+def check_token_cap():
+    tier = get_user_tier()
+    cap = DAILY_TOKEN_CAP.get(tier, 5000)
+    used = get_daily_tokens_used()
+    if used >= cap:
+        st.warning(f"Daily token limit reached for your tier ({tier}). Upgrade or wait until tomorrow.")
+        st.stop()
+    return True
+
+# Example usage before querying models:
+if check_token_cap():
+    # Run your parallel queries...
+    # After successful query, estimate tokens used (or use real count if available)
+    estimated_tokens = 4000  # replace with real token count from API responses
+    add_tokens_used(estimated_tokens)
