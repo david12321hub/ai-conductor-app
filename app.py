@@ -1117,15 +1117,23 @@ if st.session_state.user:
         st.divider()
         st.markdown("### Plan Actions")
 
-        can_execute = balance > 0 or st.session_state.get("free_trial_used", False)
+        # Paid = user has actually purchased credits or a subscription.
+        # Free trial users start with 10 initial credits and drop to ≤9 after one query.
+        is_paid = get_user_tier(balance) in ("payg", "pro_unlimited", "enterprise_unlimited")
+
+        _UPGRADE_MSG = (
+            "Executing and saving plans requires credits or an active subscription. "
+            "Choose a plan in the sidebar — Pay-as-you-go from **$5**, "
+            "or **Pro Unlimited** at **$10/mo**."
+        )
 
         st.markdown('<span class="plan-exec-marker"></span>', unsafe_allow_html=True)
         col_exec, col_save = st.columns(2)
 
         with col_exec:
-            if st.button("Execute Plan", disabled=not can_execute, use_container_width=True):
-                if not can_execute:
-                    st.warning("No credits left. Buy credits or upgrade to execute plans.")
+            if st.button("Execute Plan", use_container_width=True):
+                if not is_paid:
+                    st.warning(_UPGRADE_MSG)
                 else:
                     import subprocess, tempfile, sys, re
                     code = st.session_state.get("last_code", "")
@@ -1149,9 +1157,9 @@ if st.session_state.user:
                         st.success("Plan executed!")
 
         with col_save:
-            if not can_execute:
-                st.button("Save Plan", disabled=True, use_container_width=True)
-                st.caption("No credits left. Buy credits or upgrade to save plans.")
+            if not is_paid:
+                if st.button("Save Plan", use_container_width=True):
+                    st.warning(_UPGRADE_MSG)
             else:
                 plan_text = st.session_state.get("last_plan", "")
                 st.download_button(
