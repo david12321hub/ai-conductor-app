@@ -854,7 +854,7 @@ if st.session_state.user:
 
     # ---- Sidebar ----
     with st.sidebar:
-        st.image("conductor_logo.jpg", width=90)
+        st.image("sidebar_logo.png", width=90)
         st.markdown(
             f'<p style="color:#8b949e;font-size:0.875rem;margin:0">Signed in as '
             f'<span class="sidebar-email">{user_email}</span></p>',

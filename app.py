@@ -290,7 +290,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-LOGO_PATH = str(Path(__file__).parent / "conductor_logo.jpg")
+LOGO_PATH         = str(Path(__file__).parent / "conductor_logo.jpg")
+SIDEBAR_LOGO_PATH = str(Path(__file__).parent / "sidebar_logo.png")
 
 # ==================== Supabase Setup (direct REST) ====================
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
@@ -844,7 +845,7 @@ if st.session_state.user:
 
     # ---- Sidebar ----
     with st.sidebar:
-        st.image(LOGO_PATH, width=90)
+        st.image(SIDEBAR_LOGO_PATH, width=90)
         st.markdown(
             f'<p style="color:#8b949e;font-size:0.875rem;margin:0">Signed in as '
             f'<span class="sidebar-email">{user_email}</span></p>',
