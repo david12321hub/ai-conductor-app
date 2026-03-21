@@ -844,7 +844,11 @@ if st.session_state.user:
     # ---- Sidebar ----
     with st.sidebar:
         st.image(LOGO_PATH, width=90)
-        st.caption(f"Signed in as {user_email}")
+        st.markdown(
+            f'<p style="color:#8b949e;font-size:0.875rem;margin:0">Signed in as '
+            f'<span style="color:#00d4ff">{user_email}</span></p>',
+            unsafe_allow_html=True,
+        )
         st.divider()
         st.header("Choose Your Plan")
         st.caption("Start free or upgrade for unlimited access.")
