@@ -1182,44 +1182,38 @@ if st.session_state.user:
                     use_container_width=True,
                 )
 
-    # ==================== Floating AI Helper Button & Chat ====================
-    if "helper_open" not in st.session_state:
-        st.session_state.helper_open = False
+    # ==================== AI Helper Chat ====================
     if "helper_messages" not in st.session_state:
         st.session_state.helper_messages = []
 
-    st.markdown("---")
-    col_spacer, col_btn = st.columns([8, 1])
-    with col_btn:
-        if st.button("💬 Help", use_container_width=True, help="Ask the AI Helper about the app"):
-            st.session_state.helper_open = not st.session_state.helper_open
-
-    if st.session_state.helper_open:
-        st.markdown("### 💡 AI Helper")
+    with st.expander("AI Helper", expanded=False):
         st.caption("Ask me anything about using AI Conductor")
 
         for msg in st.session_state.helper_messages:
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
 
-        helper_input = st.chat_input("Type your question here...", key="helper_chat_input")
+        h_col1, h_col2 = st.columns([5, 1])
+        with h_col1:
+            helper_input = st.text_input(
+                "Question", key="helper_text_input",
+                label_visibility="collapsed",
+                placeholder="Type your question here...",
+            )
+        with h_col2:
+            helper_send = st.button("Send", key="helper_send", use_container_width=True)
 
-        if helper_input:
+        if helper_send and helper_input:
             st.session_state.helper_messages.append({"role": "user", "content": helper_input})
-            with st.chat_message("user"):
-                st.write(helper_input)
-
-            with st.spinner("Helper is thinking..."):
+            with st.spinner("Thinking..."):
                 _system = (
                     "You are a friendly, patient assistant for the AI Conductor app. "
                     "Answer questions about how to use the app, its features, pricing tiers, "
                     "or troubleshooting. Keep answers short, clear, and encouraging."
                 )
                 response = get_claude().invoke(f"{_system}\n\nUser question: {helper_input}").content
-
             st.session_state.helper_messages.append({"role": "assistant", "content": response})
-            with st.chat_message("assistant"):
-                st.write(response)
+            st.rerun()
 
 else:
     show_auth()
