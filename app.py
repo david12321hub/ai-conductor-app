@@ -52,24 +52,28 @@ st.markdown("""
         border-radius: 6px !important;
     }
 
-    /* ── Chat input bottom area — grey surround ── */
+    /* ── Chat input bottom area — grey surround, all children grey ── */
     [data-testid="stBottom"],
-    [data-testid="stBottomBlockContainer"] {
+    [data-testid="stBottomBlockContainer"],
+    [data-testid="stBottom"] > div,
+    [data-testid="stBottom"] div {
         background-color: #6e7681 !important;
-        padding: 12px !important;
+        padding: 0 !important;
     }
 
-    /* ── Chat input box ── */
-    [data-testid="stChatInput"],
-    [data-testid="stChatInput"] > div,
-    [data-testid="stChatInputContainer"] {
+    /* ── Chat input box — cyan (higher specificity overrides grey above) ── */
+    [data-testid="stBottom"] [data-testid="stChatInput"],
+    [data-testid="stBottom"] [data-testid="stChatInput"] > div,
+    [data-testid="stBottom"] [data-testid="stChatInputContainer"] {
         background-color: #00d4ff !important;
         padding: 8px !important;
         border-radius: 10px !important;
         border: none !important;
     }
+
+    /* ── Textarea — white background, black text ── */
+    [data-testid="stBottom"] textarea,
     [data-testid="stChatInput"] textarea,
-    .stChatInput textarea,
     [data-testid="stChatInputContainer"] textarea {
         background-color: #ffffff !important;
         color: #000000 !important;
@@ -77,23 +81,23 @@ st.markdown("""
         border-radius: 6px !important;
         outline: none !important;
         box-shadow: none !important;
+        caret-color: #000000 !important;
     }
+    [data-testid="stBottom"] textarea:focus,
     [data-testid="stChatInput"] textarea:focus,
-    [data-testid="stChatInput"] textarea:focus-visible,
-    [data-testid="stChatInputContainer"] textarea:focus {
+    [data-testid="stChatInput"] textarea:focus-visible {
         background-color: #ffffff !important;
         color: #000000 !important;
         border: none !important;
         outline: none !important;
         box-shadow: none !important;
     }
-    [data-testid="stChatInput"] button svg,
-    [data-testid="stChatInputContainer"] button svg {
-        fill: #ffffff !important;
-        color: #ffffff !important;
-    }
-    [data-testid="stChatInput"] button,
-    [data-testid="stChatInputContainer"] button {
+
+    /* ── Send button ── */
+    [data-testid="stBottom"] button svg,
+    [data-testid="stChatInput"] button svg { fill: #ffffff !important; }
+    [data-testid="stBottom"] button,
+    [data-testid="stChatInput"] button {
         background-color: transparent !important;
         border: none !important;
     }
