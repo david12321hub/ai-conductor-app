@@ -52,6 +52,13 @@ st.markdown("""
         border-radius: 6px !important;
     }
 
+    /* ── Chat input bottom area — grey surround ── */
+    [data-testid="stBottom"],
+    [data-testid="stBottomBlockContainer"] {
+        background-color: #6e7681 !important;
+        padding: 12px !important;
+    }
+
     /* ── Chat input box ── */
     [data-testid="stChatInput"],
     [data-testid="stChatInput"] > div,
@@ -819,11 +826,6 @@ def call_ai_safely(name: str, fn, prompt: str, status_widget):
 
 # ==================== Main App ====================
 if st.session_state.user:
-    # Grey main area only when logged in
-    st.markdown("""<style>
-    :root { --background-color: #6e7681; }
-    .block-container, .stMainBlockContainer { background-color: #6e7681 !important; }
-    </style>""", unsafe_allow_html=True)
     user_id = st.session_state.user.id
     user_email = st.session_state.user.email
     balance = get_credits(user_id)
