@@ -19,9 +19,18 @@ st.markdown("""
     footer { display: none !important; }
 
     /* ── Text ── */
-    h1, h2, h4, h5, h6 { color: #00d4ff !important; font-family: 'Helvetica Neue', sans-serif; }
-    h3 { color: #ffc107 !important; font-family: 'Helvetica Neue', sans-serif; }
-    section[data-testid="stSidebar"] h3 { color: #00d4ff !important; }
+    h1, h2, h3, h4, h5, h6 { color: #00d4ff !important; font-family: 'Helvetica Neue', sans-serif; }
+    /* override span/div inside headings so the text isn't overridden by the global span rule */
+    h1 span, h1 div, h1 p,
+    h2 span, h2 div, h2 p,
+    h4 span, h4 div, h4 p { color: #00d4ff !important; }
+    /* Choose Your Plan — amber for h3 and all children */
+    h3, h3 span, h3 div, h3 p { color: #ffc107 !important; }
+    /* sidebar headings stay cyan */
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h1 span,
+    section[data-testid="stSidebar"] h2, section[data-testid="stSidebar"] h2 span,
+    section[data-testid="stSidebar"] h3, section[data-testid="stSidebar"] h3 span,
+    section[data-testid="stSidebar"] h3 p, section[data-testid="stSidebar"] h3 div { color: #00d4ff !important; }
     p, div, span, label, small, li, td, th { color: #e6edf3 !important; }
     section[data-testid="stSidebar"] span.sidebar-email { color: #00d4ff !important; }
     .stCaption, [data-testid="stCaptionContainer"] p,
