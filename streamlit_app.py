@@ -701,7 +701,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 
 # ==================== Plans (main area) ====================
 def show_plans(user_email: str, user_id: str):
-    st.markdown('<h3 class="amber">Choose Your Plan</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 style="color:#ffc107 !important">Choose Your Plan</h3>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
