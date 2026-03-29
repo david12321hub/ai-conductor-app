@@ -696,7 +696,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 
 # ==================== Plans (main area) ====================
 def show_plans(user_email: str, user_id: str):
-    st.subheader("Choose Your Plan")
+    st.markdown('<h3 style="color:#ffc107">Choose Your Plan</h3>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
@@ -852,7 +852,7 @@ if st.session_state.user:
             unsafe_allow_html=True,
         )
         st.divider()
-        st.header("Choose Your Plan")
+        st.markdown('<h2 style="color:#ffc107">Choose Your Plan</h2>', unsafe_allow_html=True)
         st.caption("Start free or upgrade for unlimited access.")
 
         with st.expander(" Free Trial — One-Time", expanded=True):
