@@ -17,10 +17,11 @@ st.markdown("""
     footer { display: none !important; }
 
     /* ── Text ── */
-    h1, h2, h3, h4, h5, h6 { color: #00d4ff !important; font-family: 'Helvetica Neue', sans-serif; }
+    h1, h2, h4, h5, h6 { color: #00d4ff !important; font-family: 'Helvetica Neue', sans-serif; }
+    h3 { color: #ffc107 !important; font-family: 'Helvetica Neue', sans-serif; }
+    section[data-testid="stSidebar"] h3 { color: #00d4ff !important; }
     p, div, span, label, small, li, td, th { color: #e6edf3 !important; }
     section[data-testid="stSidebar"] span.sidebar-email { color: #00d4ff !important; }
-    h1.amber, h2.amber, h3.amber, h4.amber { color: #ffc107 !important; }
     .stCaption, [data-testid="stCaptionContainer"] p,
     [data-testid="stCaptionContainer"] { color: #8b949e !important; }
     [data-testid="stMetricValue"] { color: #00d4ff !important; }
@@ -701,7 +702,7 @@ def show_upgrade(user_email: str, user_id: str, balance: int):
 
 # ==================== Plans (main area) ====================
 def show_plans(user_email: str, user_id: str):
-    st.markdown('<h3 style="color:#ffc107 !important">Choose Your Plan</h3>', unsafe_allow_html=True)
+    st.subheader("Choose Your Plan")
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
