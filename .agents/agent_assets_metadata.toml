@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "O28xvmpPOGrex1dn5Wa2C"
+uri = "file://color_swatches.jpg"
+type = "image"
+title = "Colour Swatches with Hex Codes"
