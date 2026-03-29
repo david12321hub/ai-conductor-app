@@ -50,31 +50,48 @@ st.markdown("""
         border-radius: 6px !important;
     }
 
-    /* ── Chat input bottom area — grey surround, all children grey ── */
-    [data-testid="stBottom"],
+    /* ── Chat input bottom area — grey strip, taller, centred ── */
+    [data-testid="stBottom"] {
+        background-color: #6e7681 !important;
+        min-height: 120px !important;
+        display: flex !important;
+        align-items: center !important;
+        padding: 16px 24px !important;
+    }
     [data-testid="stBottomBlockContainer"],
-    [data-testid="stBottom"] > div,
+    [data-testid="stBottom"] > div {
+        background-color: #6e7681 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
     [data-testid="stBottom"] div {
         background-color: #6e7681 !important;
         padding: 0 !important;
     }
 
-    /* ── Chat input box — cyan (higher specificity overrides grey above) ── */
+    /* ── Chat input box — cyan; higher specificity restores cyan over grey ── */
     [data-testid="stBottom"] [data-testid="stChatInput"],
-    [data-testid="stBottom"] [data-testid="stChatInput"] > div,
     [data-testid="stBottom"] [data-testid="stChatInputContainer"] {
         background-color: #00d4ff !important;
         padding: 8px !important;
         border-radius: 10px !important;
         border: none !important;
     }
+    /* All inner divs of the chat input also cyan — removes side grey patches */
+    [data-testid="stBottom"] [data-testid="stChatInput"] div,
+    [data-testid="stBottom"] [data-testid="stChatInputContainer"] div {
+        background-color: #00d4ff !important;
+        padding: 0 !important;
+    }
 
-    /* ── Textarea — white background, black text ── */
+    /* ── Textarea — white bg, black text (-webkit-text-fill-color beats Chrome override) ── */
     [data-testid="stBottom"] textarea,
+    [data-testid="stBottom"] [data-testid="stChatInputContainer"] textarea,
     [data-testid="stChatInput"] textarea,
     [data-testid="stChatInputContainer"] textarea {
         background-color: #ffffff !important;
         color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
         border: none !important;
         border-radius: 6px !important;
         outline: none !important;
@@ -82,10 +99,12 @@ st.markdown("""
         caret-color: #000000 !important;
     }
     [data-testid="stBottom"] textarea:focus,
+    [data-testid="stBottom"] [data-testid="stChatInputContainer"] textarea:focus,
     [data-testid="stChatInput"] textarea:focus,
     [data-testid="stChatInput"] textarea:focus-visible {
         background-color: #ffffff !important;
         color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
         border: none !important;
         outline: none !important;
         box-shadow: none !important;
