@@ -13,6 +13,8 @@ st.markdown("""
     <style>
     /* ── Base ── */
     .stApp, .stApp > div { background-color: #0e1117 !important; color: #e6edf3 !important; }
+    .main, .main .block-container,
+    [data-testid="stMain"], [data-testid="stMain"] > div { background-color: #6e7681 !important; }
     header[data-testid="stHeader"] { background-color: #0e1117 !important; }
     footer { display: none !important; }
 
@@ -52,7 +54,7 @@ st.markdown("""
     [data-testid="stChatInput"],
     [data-testid="stChatInput"] > div,
     [data-testid="stChatInputContainer"] {
-        background-color: #1a4731 !important;
+        background-color: #00d4ff !important;
         padding: 8px !important;
         border-radius: 10px !important;
         border: none !important;
