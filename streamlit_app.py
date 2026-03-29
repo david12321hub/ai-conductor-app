@@ -13,8 +13,8 @@ st.markdown("""
     <style>
     /* ── Base ── */
     .stApp, .stApp > div { background-color: #0e1117 !important; color: #e6edf3 !important; }
-    .main, .main .block-container,
-    [data-testid="stMain"], [data-testid="stMain"] > div { background-color: #6e7681 !important; }
+    /* login page — keep main content dark */
+    .block-container, .stMainBlockContainer { background-color: #0e1117 !important; }
     header[data-testid="stHeader"] { background-color: #0e1117 !important; }
     footer { display: none !important; }
 
@@ -60,18 +60,20 @@ st.markdown("""
         border: none !important;
     }
     [data-testid="stChatInput"] textarea,
-    .stChatInput textarea {
+    .stChatInput textarea,
+    [data-testid="stChatInputContainer"] textarea {
         background-color: #ffffff !important;
-        color: #1a1a1a !important;
+        color: #000000 !important;
         border: none !important;
         border-radius: 6px !important;
         outline: none !important;
         box-shadow: none !important;
     }
     [data-testid="stChatInput"] textarea:focus,
-    [data-testid="stChatInput"] textarea:focus-visible {
+    [data-testid="stChatInput"] textarea:focus-visible,
+    [data-testid="stChatInputContainer"] textarea:focus {
         background-color: #ffffff !important;
-        color: #1a1a1a !important;
+        color: #000000 !important;
         border: none !important;
         outline: none !important;
         box-shadow: none !important;
@@ -826,6 +828,11 @@ def call_ai_safely(name: str, fn, prompt: str, status_widget):
 
 # ==================== Main App ====================
 if st.session_state.user:
+    # Grey main area only when logged in
+    st.markdown("""<style>
+    :root { --background-color: #6e7681; }
+    .block-container, .stMainBlockContainer { background-color: #6e7681 !important; }
+    </style>""", unsafe_allow_html=True)
     user_id = st.session_state.user.get("id", "")
     user_email = st.session_state.user.get("email", "")
     balance = get_credits(user_id)
