@@ -335,7 +335,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-LOGO_PATH         = str(Path(__file__).parent / "conductor_logo.jpg")
+LOGO_PATH         = str(Path(__file__).parent / "frontcover1.jpg")
 SIDEBAR_LOGO_PATH = str(Path(__file__).parent / "sidebar_logo.png")
 
 # ==================== Supabase Setup (direct REST) ====================

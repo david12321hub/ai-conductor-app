@@ -641,7 +641,7 @@ if "checkout_url" not in st.session_state:
 
 # ==================== Auth UI ====================
 def show_auth():
-    st.image("conductor_logo.jpg", use_container_width=True)
+    st.image("frontcover1.jpg", use_container_width=True)
     st.title("AI Conductor")
     st.caption("One task → Multiple AIs → Best plan + execution")
     st.divider()
@@ -1010,7 +1010,7 @@ if st.session_state.user:
         show_upgrade(user_email, user_id, balance)
         st.stop()
 
-    st.image("conductor_logo.jpg", use_container_width=True)
+    st.image("frontcover1.jpg", use_container_width=True)
     st.title("AI Conductor")
     st.caption("One task → Claude · Gemini · Cohere · Mistral → Best combined plan")
     st.markdown("Welcome! Type any task or question below — AI Conductor will handle the rest.")
